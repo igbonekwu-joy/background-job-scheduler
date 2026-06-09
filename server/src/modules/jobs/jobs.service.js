@@ -49,6 +49,35 @@ export const saveJob = async (jobData) => {
     return { statusCode: StatusCodes.CREATED, data: { status: 'success', job } };
 }
 
+export const fetchJobs = async ({ status, limit, offset }) => {
+    const params = [];
+    let where = '';
+    
+    if (status) {
+        params.push(status);
+        where = `WHERE j.status = $${params.length}`;
+    }
+    
+    params.push(limit, offset);
+    
+    const { rows } = await pool.query(
+        `SELECT
+            j.*,
+            COALESCE(
+                json_agg(jd.depends_on) FILTER (WHERE jd.depends_on IS NOT NULL),
+                '[]'
+            ) AS dependencies
+        FROM jobs j
+        LEFT JOIN job_dependencies jd ON jd.job_id = j.id
+        ${where}
+        GROUP BY j.id
+        ORDER BY j.created_at DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+    );
+    return { statusCode: StatusCodes.OK, data: { status: 'success', count: rows.length, jobs: rows } };
+}
+
 export async function logEvent(client, { jobId, event, level = 'info', message, metadata = {} }) {
   await client.query(
     `INSERT INTO job_logs (job_id, event, level, message, metadata)
