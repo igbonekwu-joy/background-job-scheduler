@@ -77,18 +77,18 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
  * Called by the worker every time a job is moved to DLQ.
  * If unresolved count crosses the threshold, fires a simulated alert.
  */
-// export async function checkDlqThreshold() {
-//   const { rows: [{ count }] } = await pool.query(
-//     `SELECT COUNT(*)::int AS count FROM dead_letter_queue WHERE resolved = FALSE`
-//   );
+export const checkDlqThreshold = async () => {
+  const { rows: [{ count }] } = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM dead_letter_queue WHERE resolved = FALSE`
+  );
  
-//   if (count >= DLQ_ALERT_THRESHOLD) {
-//     winston.error('DLQ ALERT: threshold exceeded — engineering action required', {
-//       unresolved_count: count,
-//       threshold:        DLQ_ALERT_THRESHOLD,
-//       alert_type:       'dlq_overflow',
-//       // In production: trigger your email handler here
-//     });
-//   }
-//   return count;
-// }
+  if (count >= DLQ_ALERT_THRESHOLD) {
+    winston.error('DLQ ALERT: threshold exceeded — engineering action required', {
+      unresolved_count: count,
+      threshold:        DLQ_ALERT_THRESHOLD,
+      alert_type:       'dlq_overflow',
+      // In production: trigger your email handler here
+    });
+  }
+  return count;
+}

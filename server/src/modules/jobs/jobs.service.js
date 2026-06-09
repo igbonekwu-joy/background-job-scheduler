@@ -161,7 +161,7 @@ export const fetchStats = async () => {
     return { statusCode: StatusCodes.OK, data: { status: 'success', stats } };
 }
 
-export async function logEvent(client, { jobId, event, level = 'info', message, metadata = {} }) {
+export const  logEvent = async (client, { jobId, event, level = 'info', message, metadata = {} }) => {
   await client.query(
     `INSERT INTO job_logs (job_id, event, level, message, metadata)
      VALUES ($1, $2, $3, $4, $5)`,
