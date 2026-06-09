@@ -32,6 +32,8 @@ export const up = async () => {
             started_at        TIMESTAMPTZ   NULL,
             completed_at      TIMESTAMPTZ   NULL,
 
+            locked_at         TIMESTAMPTZ   NULL,
+
             effective_priority  NUMERIC(6, 2)  NOT NULL DEFAULT 2,
 
             heap_index        INTEGER       NULL
