@@ -145,6 +145,22 @@ export const cancelJobById = async (id) => {
     return { statusCode: StatusCodes.OK, data: { status: 'success', job: updated } };
 }
 
+export const fetchStats = async () => {
+    const { rows: statusRows } = await pool.query(
+        `SELECT status, COUNT(*)::int AS count FROM jobs GROUP BY status`
+    );
+    
+    const { rows: [dlqRow] } = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM dead_letter_queue WHERE resolved = FALSE`
+    );
+    
+    const stats = { pending: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 };
+    for (const row of statusRows) stats[row.status] = row.count;
+    stats.dlq_unresolved = dlqRow.count;
+
+    return { statusCode: StatusCodes.OK, data: { status: 'success', stats } };
+}
+
 export async function logEvent(client, { jobId, event, level = 'info', message, metadata = {} }) {
   await client.query(
     `INSERT INTO job_logs (job_id, event, level, message, metadata)
