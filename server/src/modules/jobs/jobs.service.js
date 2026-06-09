@@ -115,6 +115,36 @@ export const fetchJobLogs = async (jobId, { limit = 200 }) => {
     return { statusCode: StatusCodes.OK, data: { status: 'success', logs: rows } };
 }
 
+export const cancelJobById = async (id) => {
+    const { rows: [job] } = await pool.query(
+      `SELECT id, status FROM jobs WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+
+    if (!job) 
+        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: `Job ${id} not found` } };
+ 
+    if (['completed', 'failed', 'cancelled'].includes(job.status)) {
+        return { statusCode: StatusCodes.BAD_REQUEST, data: { status: 'error', message: `Cannot cancel a job with status of '${job.status}'` } };
+    }
+ 
+    const { rows: [updated] } = await pool.query(
+      `UPDATE jobs SET status = 'cancelled' WHERE id = $1 RETURNING *`,
+      [id]
+    );
+ 
+    await logEvent(pool, {
+      jobId:   id,
+      event:   'job.cancelled',
+      level:   'warn',
+      message: `Job cancelled (was ${job.status})`,
+      metadata: { previous_status: job.status }
+    });
+ 
+    winston.info(`Job cancelled: { job_id: ${id}, previous_status: ${job.status} }`);
+    return { statusCode: StatusCodes.OK, data: { status: 'success', job: updated } };
+}
+
 export async function logEvent(client, { jobId, event, level = 'info', message, metadata = {} }) {
   await client.query(
     `INSERT INTO job_logs (job_id, event, level, message, metadata)

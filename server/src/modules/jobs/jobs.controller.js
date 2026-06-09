@@ -1,5 +1,5 @@
 import { StatusCodes } from "http-status-codes";
-import { fetchJobById, fetchJobs, saveJob, fetchJobLogs } from "./jobs.service.js";
+import { fetchJobById, fetchJobs, saveJob, fetchJobLogs, cancelJobById } from "./jobs.service.js";
 import { validateCreateJob } from "./jobs.validator.js";
 
 export const createJob = async (req, res) => {
@@ -36,7 +36,12 @@ export const getJobLogs = async (req, res) => {
     const logs = await fetchJobLogs(req.params.id, {
       limit: req.query.limit ? parseInt(req.query.limit) : 200
     });
-    console.log(logs)
 
     res.status(logs.statusCode).json(logs.data);
+}
+
+export const cancelJob = async (req, res) => {
+    const job = await cancelJobById(req.params.id);
+
+    res.status(job.statusCode).json(job.data);
 }
