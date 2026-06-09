@@ -92,7 +92,27 @@ export const fetchJobById = async (id) => {
         GROUP BY j.id`,
     [id]
     );
+
+    if (!job) {
+        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: 'Job not found' } };
+    }
     return { statusCode: StatusCodes.OK, data: { status: 'success', job } };
+}
+
+export const fetchJobLogs = async (jobId, { limit = 200 }) => { 
+    const job = await fetchJobById(jobId);
+    if (job.data.status === 'error') {
+        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: 'Job not found' } };
+    }
+
+    const { rows } = await pool.query(
+        `SELECT * FROM job_logs
+            WHERE job_id = $1
+            ORDER BY created_at ASC
+            LIMIT $2`,
+        [jobId, limit]
+    );
+    return { statusCode: StatusCodes.OK, data: { status: 'success', logs: rows } };
 }
 
 export async function logEvent(client, { jobId, event, level = 'info', message, metadata = {} }) {
