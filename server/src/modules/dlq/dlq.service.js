@@ -87,7 +87,7 @@ export const checkDlqThreshold = async () => {
       unresolved_count: count,
       threshold:        DLQ_ALERT_THRESHOLD,
       alert_type:       'dlq_overflow',
-      // In production: trigger your email handler here
+      // trigger email handler
     });
   }
   return count;
