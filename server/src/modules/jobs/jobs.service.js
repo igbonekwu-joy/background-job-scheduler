@@ -78,6 +78,23 @@ export const fetchJobs = async ({ status, limit, offset }) => {
     return { statusCode: StatusCodes.OK, data: { status: 'success', count: rows.length, jobs: rows } };
 }
 
+export const fetchJobById = async (id) => {
+    const { rows: [job] } = await pool.query(
+        `SELECT
+        j.*,
+        COALESCE(
+            json_agg(jd.depends_on) FILTER (WHERE jd.depends_on IS NOT NULL),
+            '[]'
+        ) AS dependencies
+        FROM jobs j
+        LEFT JOIN job_dependencies jd ON jd.job_id = j.id
+        WHERE j.id = $1
+        GROUP BY j.id`,
+    [id]
+    );
+    return { statusCode: StatusCodes.OK, data: { status: 'success', job } };
+}
+
 export async function logEvent(client, { jobId, event, level = 'info', message, metadata = {} }) {
   await client.query(
     `INSERT INTO job_logs (job_id, event, level, message, metadata)
