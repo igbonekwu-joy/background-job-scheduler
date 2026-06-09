@@ -1,5 +1,8 @@
 import { StatusCodes } from "http-status-codes";
 import pool from "../../config/database.js";
+import env from "../../config/env.js";
+
+const DLQ_ALERT_THRESHOLD = parseInt(env.DLQ_ALERT_THRESHOLD || '10');
 
 export const getDlqEntries = async (options) => {
     const { rows } = await pool.query(

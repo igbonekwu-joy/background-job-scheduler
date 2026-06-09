@@ -1,6 +1,7 @@
 import express from 'express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import { swaggerOptions } from '../docs/swagger.config.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import logger from './config/logger.js';
 import helmet from 'helmet';
@@ -9,14 +10,6 @@ import routes from './routes.js';
 
 const app = express();
 
-const options = {
-  definition: {
-    openapi: '3.0.0',
-    info: { title: 'Background Jobs Scheduler', version: '1.0.0' },
-  },
-  apis: ['./src/modules/**/*.route.js'],
-};
-
 app.use(express.json());
 
 app.use(helmet());
@@ -24,7 +17,7 @@ app.use(compression());
 
 routes(app);
 
-const specs = swaggerJsdoc(options);
+const specs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 logger();
