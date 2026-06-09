@@ -12,7 +12,7 @@ pool.on("error", (err) => {
 });
 
 pool.on("connect", () => {
-    winston.info("Database connection established");
+    //winston.info("Database connection established");
 });
 
 export default pool;    
