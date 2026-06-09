@@ -1,4 +1,4 @@
-import { getDlqEntries } from "./dlq.service.js";
+import { getDlqEntries, getDlqEntryById } from "./dlq.service.js";
 
 export const getQueue = async (req, res) => {
     const includeResolved = req.query.include_resolved === 'true';
@@ -8,4 +8,10 @@ export const getQueue = async (req, res) => {
     });
 
     res.status(entries.statusCode).json(entries.data);
+}
+
+export const getQueueById = async (req, res) => {
+    const entry = await getDlqEntryById(req.params.id);
+
+    res.status(entry.statusCode).json(entry.data);
 }

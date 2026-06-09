@@ -22,4 +22,6 @@ const router = express.Router();
  */
 router.get('/', getQueue);
 
+router.get('/:id', (req, res) => {});
+
 export default router;
