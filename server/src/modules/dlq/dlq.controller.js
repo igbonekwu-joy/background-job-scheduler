@@ -1,4 +1,4 @@
-import { getDlqEntries, getDlqEntryById } from "./dlq.service.js";
+import { getDlqEntries, getDlqEntryById, retryFromDlq } from "./dlq.service.js";
 
 export const getQueue = async (req, res) => {
     const includeResolved = req.query.include_resolved === 'true';
@@ -14,4 +14,11 @@ export const getQueueById = async (req, res) => {
     const entry = await getDlqEntryById(req.params.id);
 
     res.status(entry.statusCode).json(entry.data);
+}
+
+export const retryDlq = async (req, res) => {
+    const retriedBy = req.body?.retried_by || 'engineer';
+    const result = await retryFromDlq(req.params.id, retriedBy);
+
+    return res.status(result.statusCode).json(result.data);
 }

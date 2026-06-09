@@ -1,5 +1,6 @@
 import express from "express";
-import { getQueue } from "./dlq.controller.js";
+import { getQueue, getQueueById, retryDlq } from "./dlq.controller.js";
+import { asyncHandler } from "../../middleware/asyncHandler.js";
 
 const router = express.Router();
 
@@ -20,8 +21,43 @@ const router = express.Router();
  *       200:
  *         description: DLQ entries returned successfully
  */
-router.get('/', getQueue);
+router.get('/', asyncHandler(getQueue));
 
-router.get('/:id', (req, res) => {});
+/**
+ * @swagger
+ * /dlq/{id}:
+ *   get:
+ *     summary: Get a specific entry from the Dead Letter Queue (DLQ)
+ *     tags: [Dead Letter Queue]
+ *     parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: string
+ *        required: true
+ *     responses:
+ *       200:
+ *         description: DLQ entry returned successfully
+ */
+router.get('/:id', asyncHandler(getQueueById));
+
+
+/**
+ * @swagger
+ * /dlq/{id}/retry:
+ *   patch:
+ *     summary: Retry a specific entry from the Dead Letter Queue (DLQ)
+ *     tags: [Dead Letter Queue]
+ *     parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: string
+ *        required: true
+ *     responses:
+ *       200:
+ *         description: DLQ entry retried successfully
+ */
+router.post('/:id/retry', asyncHandler(retryDlq));
 
 export default router;

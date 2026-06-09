@@ -1,5 +1,6 @@
 import express from "express";
 import { cancelJob, createJob, getJobById, getJobLogs, getJobs, getStats } from "./jobs.controller.js";
+import { asyncHandler } from "../../middleware/asyncHandler.js";
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ const router = express.Router();
  *       200:
  *         description: Stats returned successfully
  */
-router.get('/stats', getStats);
+router.get('/stats', asyncHandler(getStats));
 
 /**
  * @swagger
@@ -42,7 +43,7 @@ router.get('/stats', getStats);
  *       200:
  *         description: Jobs returned successfully
  */
-router.get('/', getJobs);
+router.get('/', asyncHandler(getJobs));
 
 /**
  * @swagger
@@ -60,7 +61,7 @@ router.get('/', getJobs);
  *       201:
  *         description: Job created successfully
  */
-router.post('/', createJob);
+router.post('/', asyncHandler(createJob));
 
 /** @swagger
  * /jobs/{id}:
@@ -77,7 +78,7 @@ router.post('/', createJob);
  *       200:
  *         description: Job returned successfully
  */
-router.get('/:id', getJobById);
+router.get('/:id', asyncHandler(getJobById));
 
 /** @swagger
  * /jobs/{id}/logs:
@@ -99,7 +100,7 @@ router.get('/:id', getJobById);
  *       200:
  *         description: Logs returned successfully
  */
-router.get('/:id/logs', getJobLogs);
+router.get('/:id/logs', asyncHandler(getJobLogs));
 
 /** @swagger
  * /jobs/{id}/cancel:
@@ -116,6 +117,6 @@ router.get('/:id/logs', getJobLogs);
  *       200:
  *         description: Job cancelled successfully
  */
-router.patch('/:id/cancel', cancelJob);
+router.patch('/:id/cancel', asyncHandler(cancelJob));
 
 export default router;

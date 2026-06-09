@@ -24,3 +24,71 @@ export const getDlqEntryById = async (id) => {
 
     return { statusCode: StatusCodes.OK, data: { success: true, data: entry  } };
 }
+
+export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
+    const { rows: [entry] } = await SecurityPolicyViolationEvent.query(
+        `SELECT * FROM dead_letter_queue WHERE id = $1 FOR UPDATE`,
+        [dlqId]
+    );
+    if (!entry) 
+        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: `DLQ entry ${dlqId} not found` } };
+ 
+    // Reset the original job
+    const { rows: [job] } = await client.query(
+      `UPDATE jobs
+       SET status        = 'pending',
+           retry_count   = 0,
+           error_message = NULL,
+           run_at        = NOW(),
+           scheduled_at  = NOW(),
+           started_at    = NULL,
+           completed_at  = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [entry.job_id]
+    );
+    if (!job) 
+        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: `Original job ${entry.job_id} not found` } };
+ 
+    // Stamp the DLQ entry
+    await pool.query(
+      `UPDATE dead_letter_queue
+       SET retried_at = NOW(), retried_by = $1
+       WHERE id = $2`,
+      [retriedBy, dlqId]
+    );
+ 
+    await logEvent(pool, {
+      jobId:   entry.job_id,
+      event:   'job.retry',
+      level:   'warn',
+      message: `Manual retry triggered from DLQ by ${retriedBy}`,
+      metadata: { dlq_id: dlqId, retried_by: retriedBy }
+    });
+ 
+    await pool.query('COMMIT');
+    winston.info('DLQ manual retry triggered', { dlq_id: dlqId, job_id: entry.job_id, retried_by: retriedBy });
+
+    return { statusCode: StatusCodes.OK, data: { status: 'success', message: 'Job retried successfully', job, dlqEntry: entry } };
+}
+ 
+// ─── CHECK DLQ ALERT THRESHOLD ───────────────────────────────────────────────
+/**
+ * Called by the worker every time a job is moved to DLQ.
+ * If unresolved count crosses the threshold, fires a simulated alert.
+ */
+// export async function checkDlqThreshold() {
+//   const { rows: [{ count }] } = await pool.query(
+//     `SELECT COUNT(*)::int AS count FROM dead_letter_queue WHERE resolved = FALSE`
+//   );
+ 
+//   if (count >= DLQ_ALERT_THRESHOLD) {
+//     winston.error('DLQ ALERT: threshold exceeded — engineering action required', {
+//       unresolved_count: count,
+//       threshold:        DLQ_ALERT_THRESHOLD,
+//       alert_type:       'dlq_overflow',
+//       // In production: trigger your email handler here
+//     });
+//   }
+//   return count;
+// }
