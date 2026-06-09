@@ -46,7 +46,7 @@ export const saveJob = async (jobData) => {
     });
 
     winston.info(`Job created: { job_id: ${job.id}, type: ${type}, priority: ${priority}, scheduled_at: ${scheduled_at} }`);
-    return { statusCode: StatusCodes.CREATED, data: { status: 'success', job } };
+    return { statusCode: StatusCodes.CREATED, data: { status: 'success', message: 'Job created successfully', job } };
 }
 
 export const fetchJobs = async ({ status, limit, offset }) => {
@@ -142,7 +142,7 @@ export const cancelJobById = async (id) => {
     });
  
     winston.info(`Job cancelled: { job_id: ${id}, previous_status: ${job.status} }`);
-    return { statusCode: StatusCodes.OK, data: { status: 'success', job: updated } };
+    return { statusCode: StatusCodes.OK, data: { status: 'success', message: 'Job cancelled successfully', job: updated } };
 }
 
 export const fetchStats = async () => {
