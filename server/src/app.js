@@ -12,7 +12,7 @@ const app = express();
 const options = {
   definition: {
     openapi: '3.0.0',
-    info: { title: 'Background Jobs API', version: '1.0.0' },
+    info: { title: 'Background Jobs Scheduler', version: '1.0.0' },
   },
   apis: ['./src/modules/**/*.route.js'],
 };
