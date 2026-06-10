@@ -1,0 +1,376 @@
+# Background Job Scheduler
+
+A background job scheduler built at Dilamme. Jobs are created via a REST API, queued in a heap-based priority queue, processed by an independent worker process, and tracked through a React dashboard with live updates.
+
+---
+
+## Repository layout
+
+```
+/
+├── client/               React frontend (Vite)
+├── server/               Node.js API + worker
+│   ├── docs/             Swagger docs
+│   └── src/
+│       ├── config/       Database pool, Winston logger
+│       ├── middleware/   Async handler, and error handler
+│       ├── migrations/   Migrations file for the database
+│       ├── modules/      All module folders
+|       |   ├── dlq/      Dead-Letter Queue resource
+│       |   ├── handlers/ Job type implementations (email simulation)
+|       |   ├── jobs/     Jobs resource
+|       |   ├── scheduler/ Min-heap, timing wheel, scheduler loop
+|       |   ├── scripts/   Time Wheel Benchmark
+|       |   ├── sse/      Server Side Events resource
+|       |   └── worker/   Background Worker process
+|       |
+│       ├── utils/        Shared event emitter
+│       ├── app.js    
+│       ├── routes.js     All route entry point
+|       ├── package.json       
+|       └── server.js
+├── .gitignore
+└── README.md
+```
+
+---
+
+## Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+
+---
+
+## Setup
+
+### 1. Clone and install
+
+```bash
+# Server
+cd server
+npm install
+
+# Client
+cd ../client
+npm install
+```
+
+### 2. Configure environment
+
+```bash
+cd server
+cp .env.example .env
+```
+
+Edit `.env` with your PostgreSQL credentials:
+
+```env
+DATABASE_URL=
+
+PORT=5000
+NODE_ENV=development
+
+DLQ_ALERT_THRESHOLD=10
+STARVATION_THRESHOLD_MINUTES=5
+WORKER_POLL_INTERVAL_MS=2000
+```
+
+Create a `.env` in `client/`:
+
+```env
+VITE_API_BASE_URL=http://localhost:5173
+```
+
+### 3. Create the database
+
+```bash
+psql -U postgres -c "CREATE DATABASE job_scheduler;"
+```
+
+### 4. Run migrations
+
+```bash
+cd server
+npm run migrate
+```
+
+To roll back:
+
+```bash
+npm run migrate:down
+```
+
+---
+
+## Running the app
+
+The API server and the worker are two separate processes. Open two terminals.
+
+**Terminal 1 — API server**
+
+```bash
+cd server
+npm start
+# or in development:
+npm run dev
+```
+
+**Terminal 2 — Worker**
+
+```bash
+cd server
+npm run worker
+# or in development:
+npm run dev:worker
+```
+
+**Terminal 3 — Frontend**
+
+```bash
+cd client
+npm run dev
+```
+
+| Service | Default URL |
+|---|---|
+| API server | http://localhost:5000 |
+| Frontend | http://localhost:5173 |
+| Health check | http://localhost:5000/health |
+
+---
+
+## API reference
+
+All responses follow the shape `{ success: boolean, data: ... }`.
+
+### Jobs
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/jobs` | Create a job |
+| `GET` | `/api/jobs` | List jobs |
+| `GET` | `/api/jobs/:id` | Get a single job with its dependencies |
+| `GET` | `/api/jobs/:id/logs` | Get structured event logs for a job |
+| `PATCH` | `/api/jobs/:id/cancel` | Cancel a pending or processing job |
+| `GET` | `/api/stats` | Job counts by status + unresolved DLQ count |
+
+#### POST /api/jobs
+
+```json
+{
+  "type": "send_email",
+  "priority": 1,
+  "payload": {
+    "to": "user@example.com",
+    "subject": "Welcome"
+  },
+  "scheduled_at": "2026-06-15T10:00:00Z",
+  "recurring_interval": "every_5_minutes",
+  "max_retries": 3,
+  "dependencies": ["<job-uuid>"]
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `type` | string | ✓ | Must match a registered handler. Currently: `send_email` |
+| `priority` | integer | | `1` = High, `2` = Medium (default), `3` = Low |
+| `payload` | object | | Passed as-is to the handler |
+| `scheduled_at` | ISO string | | Job will not run before this time |
+| `recurring_interval` | string | | `every_1_minute`, `every_5_minutes`, `every_1_hour` |
+| `max_retries` | integer | | Default `3`, max `10` |
+| `dependencies` | UUID[] | | Job will not run until all listed jobs are `completed` |
+
+#### GET /api/jobs
+
+Query params: `?status=pending&limit=100&offset=0`
+
+`status` accepts: `pending`, `processing`, `completed`, `failed`, `cancelled`
+
+### Dead-Letter Queue
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/dlq` | List unresolved DLQ entries |
+| `GET` | `/api/dlq/:id` | Get a single DLQ entry with full error details |
+| `POST` | `/api/dlq/:id/retry` | Manually retry a DLQ job |
+
+`GET /api/dlq` accepts `?include_resolved=true` to include already-resolved entries.
+
+`POST /api/dlq/:id/retry` accepts an optional body `{ "retried_by": "your@email.com" }`.
+
+### Live updates (SSE)
+
+```
+GET /api/events
+```
+
+Opens a persistent Server-Sent Events stream. The client receives a `job.event` frame every time a job changes status. Connect once on page load — no polling needed.
+
+```js
+const es = new EventSource('http://localhost:5000/api/events');
+
+es.addEventListener('job.event', (e) => {
+  const { job_id, status, retry_count } = JSON.parse(e.data);
+  // update your UI
+});
+```
+
+Event payload:
+
+```json
+{
+  "job_id": "uuid",
+  "type": "send_email",
+  "status": "completed | processing | pending | failed",
+  "retry_count": 1,
+  "retry_at": "ISO string — only present on retry events"
+}
+```
+
+---
+
+## Job lifecycle
+
+```
+pending → processing → completed
+                     → failed (→ dead-letter queue after max retries)
+                     → cancelled
+```
+
+A job enters `processing` when the worker locks it. It cannot be moved back to `pending` from `processing` — it will either complete, fail and retry, or be marked `cancelled` (if the API cancelled it while it was running, the result is discarded and no retry fires).
+
+---
+
+## Retry behaviour
+
+Failed jobs are retried automatically with exponential backoff and jitter:
+
+| Attempt | Delay |
+|---|---|
+| 1 | ~1 s |
+| 2 | ~5 s |
+| 3 | ~25 s |
+
+After 3 failed attempts the job is marked `failed` and a record is inserted into the dead-letter queue. The original job row remains in the `jobs` table for audit purposes.
+
+---
+
+## Dead-Letter Queue
+
+The DLQ threshold is **10 unresolved entries**. When crossed, a `DLQ ALERT` is written to the error log (and in production would trigger an email via the `send_email` handler).
+
+When an engineer retries a DLQ entry:
+1. The original job is reset to `pending` with `retry_count = 0`
+2. The DLQ entry is stamped with `retried_at` and `retried_by`
+3. If the retry fails again, a new DLQ entry is created
+
+---
+
+## Priority and starvation prevention
+
+Priority levels: `1` = High, `2` = Medium, `3` = Low.
+
+Jobs are ordered in the heap by:
+1. `effective_priority` ASC
+2. `run_at` ASC
+3. `created_at` ASC
+
+Every 30 seconds the scheduler checks for pending jobs that have been waiting longer than **5 minutes**. Their `effective_priority` is decremented by 1 (e.g. `3 → 2`, `2 → 1`), both in the database and in the in-memory heap. This prevents low-priority jobs from waiting indefinitely behind a continuous stream of high-priority work.
+
+---
+
+## DAG workflow
+
+Jobs can declare dependencies on other jobs. A job will not enter the heap — and will not run — until every job it depends on has status `completed`.
+
+Example: create three jobs where each depends on the previous one:
+
+```bash
+# Step 1 — no dependencies
+POST /api/jobs  { "type": "send_email", "payload": { "to": "a@b.com", "subject": "Report" } }
+# → returns id: "job-1"
+
+# Step 2 — depends on job-1
+POST /api/jobs  { "type": "send_email", "payload": { "to": "a@b.com", "subject": "Upload" }, "dependencies": ["job-1"] }
+# → returns id: "job-2"
+
+# Step 3 — depends on job-2
+POST /api/jobs  { "type": "send_email", "payload": { "to": "a@b.com", "subject": "Notify" }, "dependencies": ["job-2"] }
+```
+
+Jobs 2 and 3 will stay `pending` until their dependency chain resolves.
+
+---
+
+## Scheduling algorithms
+
+Two algorithms run in parallel. The heap drives actual dispatch; the timing wheel runs alongside it for benchmarking.
+
+### Min-heap
+
+The primary dispatch algorithm. Jobs are pushed when their `run_at` arrives. The most urgent job is always at index 0.
+
+- Insert: O(log n)
+- Pop: O(log n)
+
+### Timing wheel
+
+Alternative algorithm. A circular buffer of 3 600 slots (1 slot = 1 second). A job is placed into the slot corresponding to its `run_at` delay. Each tick drains one slot.
+
+- Insert: O(1)
+- Tick advance: O(1)
+
+### Benchmark
+
+```bash
+cd server
+npm run benchmark
+```
+
+Results are printed to stdout and saved to `server/logs/benchmark.json`.
+
+Sample results (your machine may differ):
+
+| n | Heap insert | Wheel insert | Winner |
+|---|---|---|---|
+| 1,000 | 6.93 ms | 2.91 ms | Timing Wheel |
+| 10,000 | 36.16 ms | 11.73 ms | Timing Wheel |
+| 100,000 | 142.49 ms | 47.84 ms | Timing Wheel |
+
+The timing wheel wins on raw insert speed at every size because inserting is a single modulo + array push (O(1)). The heap wins on ordering: it guarantees the highest-priority job is always dispatched first, which the timing wheel cannot do.
+
+---
+
+## Database schema
+
+| Table | Purpose |
+|---|---|
+| `jobs` | Every job, from creation to completion |
+| `job_dependencies` | DAG edges — which jobs must complete before another can run |
+| `dead_letter_queue` | Jobs that exhausted all retries, with full snapshot and failure reason |
+| `job_logs` | Structured event log — one row per lifecycle event per job |
+| `schema_migrations` | Tracks which migrations have been applied |
+
+---
+
+## Logging
+
+All logs are structured JSON via Winston. Every significant event writes a row to both the `job_logs` table and the Winston transports (console + `logfile.log`).
+
+Logged events: `job.created`, `job.started`, `job.retry`, `job.failed`, `job.cancelled`, `job.completed`
+
+---
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm start` | Start the API server |
+| `npm run worker` | Start the background worker |
+| `npm run migrate` | Run all pending migrations |
+| `npm run migrate:down` | Roll back all migrations |
+| `npm run benchmark` | Run heap vs timing wheel benchmark |
+| `npm run dev:api` | Start API server with nodemon |
+| `npm run dev:worker` | Start worker with nodemon |

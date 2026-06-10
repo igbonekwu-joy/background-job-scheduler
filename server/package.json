@@ -1,5 +1,5 @@
 {
-  "name": "Background-Job-Scheduler",
+  "name": "Background_Job_Scheduler",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
@@ -9,6 +9,7 @@
     "migrate": "node src/migrations/migrate.js",
     "migrate:rollback": "node src/migrations/migrate.js down",
     "worker": "node src/modules/worker/index.js",
+    "dev:worker": "nodemon src/modules/worker/index.js",
     "benchmark": "node src/modules/scripts/benchmark.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
