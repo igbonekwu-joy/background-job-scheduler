@@ -152,7 +152,7 @@ All responses follow the shape `{ success: boolean, data: ... }`.
 | `GET` | `/api/jobs` | List jobs |
 | `GET` | `/api/jobs/:id` | Get a single job with its dependencies |
 | `GET` | `/api/jobs/:id/logs` | Get structured event logs for a job |
-| `PATCH` | `/api/jobs/:id/cancel` | Cancel a pending or processing job |
+| `PATCH` | `/api/jobs/:id/cancel` | Cancel a pending or processing job (see [Cancellation](#cancellation)) |
 | `GET` | `/api/stats` | Job counts by status + unresolved DLQ count |
 
 #### POST /api/jobs
@@ -239,7 +239,31 @@ pending → processing → completed
                      → cancelled
 ```
 
-A job enters `processing` when the worker locks it. It cannot be moved back to `pending` from `processing` — it will either complete, fail and retry, or be marked `cancelled` (if the API cancelled it while it was running, the result is discarded and no retry fires).
+A job enters `processing` when the worker locks it. From `processing` it moves to `completed`, `failed`, or stays `cancelled`. It is never moved back to `pending`.
+
+### Cancellation
+
+`PATCH /api/jobs/:id/cancel` is allowed while a job is `pending` or `processing`. Jobs that are already `completed`, `failed`, or `cancelled` cannot be cancelled again.
+
+**Cancelled jobs are not processed.** The worker only claims rows with `status = 'pending'`. Once a job is `cancelled`, it is removed from the dispatch path: it will not be picked up by the scheduler, will not retry, and will not schedule a next recurring run.
+
+**If a job is already `processing` when it is cancelled**, the worker does not attempt to interrupt the in-flight handler. That is a deliberate choice:
+
+| Option | Decision | Reason |
+|---|---|---|
+| Interrupt the handler mid-execution | **Rejected** | An async handler cannot be stopped cleanly; aborting would leave external side-effects (e.g. a sent email) in an unknown state |
+| Let the handler finish, then re-check status | **Chosen** | The handler may already have done its work; what matters is the final job record reflects the cancel intent |
+
+What happens after cancel while `processing`:
+
+1. The API sets `status = 'cancelled'` immediately and logs `job.cancelled`.
+2. The handler keeps running until it returns or throws.
+3. Before writing any outcome, the worker locks the row and reads the current status.
+4. If still `cancelled`:
+   - **On success** — the handler result is discarded; status stays `cancelled` (not overwritten with `completed`); no recurring follow-up is scheduled; no DLQ resolution runs; a `job.cancelled` log notes that the result was discarded.
+   - **On failure** — no retry and no DLQ; status stays `cancelled`; a `job.cancelled` log notes that the error was ignored.
+
+The handler may have already performed its side-effect (e.g. simulated email delivery). That is acceptable: the job is recorded as `cancelled`, not `completed`, and the job chain does not continue.
 
 ---
 
