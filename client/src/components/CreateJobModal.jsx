@@ -1,17 +1,27 @@
 import { useState } from 'react';
 
-export default function CreateJobModal({ onClose, onCreate }) {
+export default function CreateJobModal({ jobs = [], onClose, onCreate }) {
   const [form, setForm] = useState({
-    type: '',
+    type: 'send_email',
     priority: 2,
     scheduled_time: '',
     interval: '',
     payload: '',
+    dependencies: [],
   });
   const [error, setError] = useState('');
 
   function update(field, value) {
     setForm(f => ({ ...f, [field]: value }));
+  }
+
+  function toggleDependency(id) {
+    setForm(f => ({
+      ...f,
+      dependencies: f.dependencies.includes(id)
+        ? f.dependencies.filter(dep => dep !== id)
+        : [...f.dependencies, id],
+    }));
   }
 
   async function handleSubmit(e) {
@@ -46,6 +56,7 @@ export default function CreateJobModal({ onClose, onCreate }) {
       interval: form.interval.trim() || '-',
       created_time: new Date().toISOString(),
       payload: parsedPayload,
+      dependencies: form.dependencies,
     };
 
     const ok = await onCreate(job);
@@ -72,14 +83,14 @@ export default function CreateJobModal({ onClose, onCreate }) {
         <form className="job-form" onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="type">Job type</label>
-            <input
+            <select
               id="type"
-              type="text"
-              placeholder="e.g. send_email"
               value={form.type}
               onChange={e => update('type', e.target.value)}
               autoFocus
-            />
+            >
+              <option value="send_email">Send Email</option>
+            </select>
           </div>
 
           <div className="field">
@@ -109,6 +120,29 @@ export default function CreateJobModal({ onClose, onCreate }) {
               <option value="every_5_minutes">Every 5 minutes</option>
               <option value="every_1_hour">Every 1 hour</option>
             </select>
+          </div>
+
+          <div className="field field-wide">
+            <span className="field-label">Dependencies (optional)</span>
+            <p className="field-hint">This job will not run until every selected job has completed.</p>
+            {jobs.length === 0 ? (
+              <p className="field-hint">No jobs available yet.</p>
+            ) : (
+              <div className="dependency-list" role="group" aria-label="Job dependencies">
+                {jobs.map(j => (
+                  <label key={j.id} className="dependency-option">
+                    <input
+                      type="checkbox"
+                      checked={form.dependencies.includes(j.id)}
+                      onChange={() => toggleDependency(j.id)}
+                    />
+                    <span className="mono">{j.id}</span>
+                    <span>{j.type}</span>
+                    <span className="dependency-status">{j.status}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="field field-wide">

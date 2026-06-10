@@ -60,7 +60,11 @@ export default function JobsPage({ jobs, onCreate, onCancel, sourceHint = '' }) 
       </div>
 
       {showModal && (
-        <CreateJobModal onClose={() => setShowModal(false)} onCreate={onCreate} />
+        <CreateJobModal
+          jobs={jobs}
+          onClose={() => setShowModal(false)}
+          onCreate={onCreate}
+        />
       )}
     </div>
   );

@@ -99,6 +99,10 @@ export async function createJob(jobInput) {
     body.recurring_interval = recurring_interval;
   }
 
+  if (Array.isArray(jobInput.dependencies) && jobInput.dependencies.length > 0) {
+    body.dependencies = jobInput.dependencies;
+  }
+
   const res = await fetch(apiUrl('/api/jobs'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
