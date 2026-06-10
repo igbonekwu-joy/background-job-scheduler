@@ -1,6 +1,8 @@
 import { StatusCodes } from "http-status-codes";
 import pool from "../../config/database.js";
 import env from "../../config/env.js";
+import winston from "winston";
+import { sendEmail } from "../handlers/emailHandler.js";
 
 const DLQ_ALERT_THRESHOLD = parseInt(env.DLQ_ALERT_THRESHOLD || '10');
 
@@ -37,7 +39,7 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
         return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: `DLQ entry ${dlqId} not found` } };
  
     // Reset the original job
-    const { rows: [job] } = await client.query(
+    const { rows: [job] } = await pool.query(
       `UPDATE jobs
        SET status        = 'pending',
            retry_count   = 0,
@@ -69,7 +71,6 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
       metadata: { dlq_id: dlqId, retried_by: retriedBy }
     });
  
-    await pool.query('COMMIT');
     winston.info('DLQ manual retry triggered', { dlq_id: dlqId, job_id: entry.job_id, retried_by: retriedBy });
 
     return { statusCode: StatusCodes.OK, data: { status: 'success', message: 'Job retried successfully', job, dlqEntry: entry } };
