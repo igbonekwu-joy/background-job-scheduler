@@ -16,7 +16,7 @@ const INTERVAL_TO_API = {
   every_1_hour: 'every_1_hour',
 };
 
-function mapStatusFromApi(status) {
+export function mapStatusFromApi(status) {
   if (status === 'processing') return 'running';
   return status;
 }
@@ -112,4 +112,16 @@ export async function createJob(jobInput) {
   }
 
   return mapJobFromApi(data.job);
+}
+
+/** Apply a SSE job.event payload onto an existing UI job row. */
+export function applyJobEventUpdate(job, event) {
+  if (job.id !== event.job_id) return job;
+
+  return {
+    ...job,
+    status: mapStatusFromApi(event.status),
+    retry_count: event.retry_count ?? job.retry_count,
+    scheduled_time: event.retry_at ?? job.scheduled_time,
+  };
 }

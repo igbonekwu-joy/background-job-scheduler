@@ -2,38 +2,53 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchJobStats } from '../api/jobs';
 import { STATUS_META } from '../data/seed';
 
-export default function DashboardPage({ jobs }) {
-  const [liveStats, setLiveStats] = useState(null);
-  const [statsSource, setStatsSource] = useState('loading');
+export default function DashboardPage({ jobs, live = false, sseStats = null, dlqCount = 0 }) {
+  const [fetchedStats, setFetchedStats] = useState(null);
+  const [fetchState, setFetchState] = useState(() => (live ? 'skipped' : 'loading'));
 
-  const localCounts = useMemo(() => {
+  const jobCounts = useMemo(() => {
     const c = { pending: 0, running: 0, completed: 0, failed: 0, dead: 0 };
     jobs.forEach(j => { c[j.status] = (c[j.status] || 0) + 1; });
     return c;
   }, [jobs]);
 
   useEffect(() => {
+    if (live) return;
+
     let cancelled = false;
 
     fetchJobStats()
       .then(result => {
         if (!cancelled) {
-          setLiveStats(result);
-          setStatsSource('live');
+          setFetchedStats(result);
+          setFetchState('done');
         }
       })
       .catch(() => {
-        if (!cancelled) setStatsSource('local');
+        if (!cancelled) setFetchState('error');
       });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [live]);
 
-  const counts = liveStats?.counts ?? localCounts;
-  const totalJobs = liveStats?.totalJobs ?? jobs.length;
+  const counts = live
+    ? { ...jobCounts, dead: dlqCount }
+    : (fetchedStats?.counts ?? { ...jobCounts, dead: dlqCount });
+
+  const totalJobs = live
+    ? (sseStats?.totalJobs ?? jobs.length)
+    : (fetchedStats?.totalJobs ?? jobs.length);
+
+  const statsSource = live
+    ? 'live'
+    : fetchState === 'loading' ? 'loading'
+    : fetchState === 'error' ? 'local'
+    : 'live';
+
   const statusHint =
     statsSource === 'loading' ? ' · syncing…'
     : statsSource === 'local' ? ' · offline'
+    : live ? ' · live'
     : '';
 
   return (

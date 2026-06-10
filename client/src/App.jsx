@@ -4,9 +4,10 @@ import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
 import DLQPage from './pages/DLQPage';
-import { fetchJobs, createJob, mapJobFromApi } from './api/jobs';
+import { fetchJobs, createJob, mapJobFromApi, applyJobEventUpdate, mapStatsFromApi, fetchJobStats } from './api/jobs';
 import { fetchDlqEntries, retryDlqEntry } from './api/dlq';
 import { seedJobs, seedDLQ } from './data/seed';
+import { useJobEvents } from './hooks/useJobEvents';
 
 export default function App() {
   const [view, setView] = useState('dashboard');
@@ -15,14 +16,17 @@ export default function App() {
   const [dataSource, setDataSource] = useState('loading');
   const [toast, setToast] = useState('');
 
+  const [liveStats, setLiveStats] = useState(null);
+
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([fetchJobs(), fetchDlqEntries()])
-      .then(([liveJobs, liveDlq]) => {
+    Promise.all([fetchJobs(), fetchDlqEntries(), fetchJobStats()])
+      .then(([liveJobs, liveDlq, stats]) => {
         if (!cancelled) {
           setJobs(liveJobs);
           setDlq(liveDlq);
+          setLiveStats(stats);
           setDataSource('live');
         }
       })
@@ -32,6 +36,23 @@ export default function App() {
 
     return () => { cancelled = true; };
   }, []);
+
+  useJobEvents((event) => {
+    if (event._type === 'stats') {
+      setLiveStats(mapStatsFromApi(event.stats));
+      return;
+    }
+
+    setJobs(prev => {
+      const exists = prev.some(job => job.id === event.job_id);
+      if (!exists) return prev;
+      return prev.map(job => applyJobEventUpdate(job, event));
+    });
+
+    if (event.status === 'failed') {
+      fetchDlqEntries().then(setDlq).catch(() => {});
+    }
+  }, { enabled: dataSource === 'live' });
 
   function showToast(msg) {
     setToast(msg);
@@ -98,7 +119,14 @@ export default function App() {
       <Sidebar view={view} onNavigate={setView} dlqCount={dlq.length} />
 
       <main className="app-content">
-        {view === 'dashboard' && <DashboardPage jobs={jobs} />}
+        {view === 'dashboard' && (
+          <DashboardPage
+            jobs={jobs}
+            live={dataSource === 'live'}
+            sseStats={liveStats}
+            dlqCount={dlq.length}
+          />
+        )}
         {view === 'jobs' && (
           <JobsPage jobs={jobs} onCreate={handleCreate} sourceHint={sourceHint} />
         )}
