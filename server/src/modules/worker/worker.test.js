@@ -117,7 +117,7 @@ describe('claimJob', () => {
 
 describe('recordSuccess', () => {
   it('completes job, resolves DLQ, and publishes event', async () => {
-    const client = createMockClient([{}, {}, {}, {}, {}]);
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const resolveDlqForJob = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
@@ -145,8 +145,42 @@ describe('recordSuccess', () => {
     assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
   });
 
+  it('keeps cancelled status and discards result when job was cancelled while running', async () => {
+    const client = createMockClient([{}, { rows: [{ status: 'cancelled' }] }, {}]);
+    const logEvent = mock.fn(async () => {});
+    const resolveDlqForJob = mock.fn(async () => {});
+    const publishJobEvent = mock.fn(async () => {});
+    const locked = {
+      ...baseJob,
+      id: 'job-1',
+      type: 'send_email',
+      recurring_interval: 'every_1_minute',
+    };
+
+    const { recordSuccess } = createWorker({
+      pool: createMockPool(client),
+      logEvent,
+      resolveDlqForJob,
+      publishJobEvent,
+    });
+
+    await recordSuccess(locked, { ok: true });
+
+    assert.equal(findQuery(client, /status\s*=\s*'completed'/), undefined);
+    assert.equal(findQuery(client, /INSERT INTO jobs/), undefined);
+    assert.equal(resolveDlqForJob.mock.calls.length, 0);
+    assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.cancelled');
+    assert.equal(logEvent.mock.calls[0].arguments[1].metadata.result_discarded, true);
+    assert.deepEqual(publishJobEvent.mock.calls[0].arguments[0], {
+      status: 'cancelled',
+      job_id: 'job-1',
+      type: 'send_email',
+    });
+    assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
+  });
+
   it('schedules next run for recurring jobs', async () => {
-    const client = createMockClient([{}, {}, {}, {}, {}]);
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const locked = {
       ...baseJob,
       id: 'job-1',
@@ -173,7 +207,7 @@ describe('recordSuccess', () => {
 
 describe('recordFailure', () => {
   it('schedules retry when attempts remain', async () => {
-    const client = createMockClient([{}, {}, {}, {}]);
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const job = { ...baseJob, max_retries: 3, retry_count: 0 };
@@ -200,8 +234,30 @@ describe('recordFailure', () => {
     assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
   });
 
+  it('does not retry when job was cancelled while handler was running', async () => {
+    const client = createMockClient([{}, { rows: [{ status: 'cancelled' }] }, {}]);
+    const logEvent = mock.fn(async () => {});
+    const publishJobEvent = mock.fn(async () => {});
+    const job = { ...baseJob, max_retries: 3, retry_count: 0 };
+    const err = new Error('handler blew up');
+
+    const { recordFailure } = createWorker({
+      pool: createMockPool(client),
+      logEvent,
+      publishJobEvent,
+    });
+
+    await recordFailure(job, err);
+
+    assert.equal(findQuery(client, /status\s*=\s*'pending'/), undefined);
+    assert.equal(findQuery(client, /INSERT INTO dead_letter_queue/), undefined);
+    assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.cancelled');
+    assert.equal(publishJobEvent.mock.calls.length, 0);
+    assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
+  });
+
   it('sends job to DLQ when max retries are exhausted', async () => {
-    const client = createMockClient([{}, {}, {}, {}, {}]);
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
@@ -217,9 +273,9 @@ describe('recordFailure', () => {
 
     await recordFailure(job, err);
 
-    assert.match(client.queries[1].sql, /INSERT INTO dead_letter_queue/);
-    assert.deepEqual(client.queries[1].params, [job.id, job, 'permanent failure']);
-    assert.match(client.queries[2].sql, /status = 'failed'/);
+    assert.match(findQuery(client, /INSERT INTO dead_letter_queue/).sql, /dead_letter_queue/);
+    assert.deepEqual(findQuery(client, /INSERT INTO dead_letter_queue/).params, [job.id, job, 'permanent failure']);
+    assert.match(findQuery(client, /status = 'failed'/).sql, /failed/);
     assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.failed');
     assert.equal(checkDlqThreshold.mock.calls.length, 1);
     assert.deepEqual(publishJobEvent.mock.calls[0].arguments[0], {
@@ -257,7 +313,7 @@ describe('processJob', () => {
       {},
       {},
     ]);
-    const successClient = createMockClient([{}, {}, {}, {}, {}]);
+    const successClient = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const handler = mock.fn(async () => ({ delivered: true }));
     const publishJobEvent = mock.fn(async () => {});
 
@@ -274,7 +330,7 @@ describe('processJob', () => {
     assert.equal(handler.mock.calls.length, 1);
     assert.equal(publishJobEvent.mock.calls[0].arguments[0].status, 'processing');
     assert.equal(publishJobEvent.mock.calls[1].arguments[0].status, 'completed');
-    assert.match(successClient.queries[1].sql, /status\s*=\s*'completed'/);
+    assert.match(findQuery(successClient, /status\s*=\s*'completed'/).sql, /completed/);
   });
 
   it('records failure when handler throws', async () => {
@@ -286,7 +342,7 @@ describe('processJob', () => {
       {},
       {},
     ]);
-    const failureClient = createMockClient([{}, {}, {}, {}]);
+    const failureClient = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}]);
     const handler = mock.fn(async () => {
       throw new Error('handler blew up');
     });
@@ -302,8 +358,8 @@ describe('processJob', () => {
 
     await processJob(baseJob);
 
-    assert.match(failureClient.queries[1].sql, /status\s*=\s*'pending'/);
-    assert.equal(failureClient.queries[1].params[0], 1);
+    const retryUpdate = findQuery(failureClient, /status\s*=\s*'pending'/);
+    assert.equal(retryUpdate.params[0], 1);
     assert.equal(publishJobEvent.mock.calls[1].arguments[0].status, 'pending');
   });
 
@@ -316,7 +372,7 @@ describe('processJob', () => {
       {},
       {},
     ]);
-    const failureClient = createMockClient([{}, {}, {}, {}]);
+    const failureClient = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}]);
     const publishJobEvent = mock.fn(async () => {});
 
     const { processJob } = createWorker({
@@ -329,7 +385,40 @@ describe('processJob', () => {
 
     await processJob(baseJob);
 
-    assert.match(failureClient.queries[1].sql, /status\s*=\s*'pending'/);
-    assert.match(failureClient.queries[1].params[2], /No handler registered/);
+    const retryUpdate = findQuery(failureClient, /status\s*=\s*'pending'/);
+    assert.match(retryUpdate.params[2], /No handler registered/);
+  });
+
+  it('preserves cancelled status when handler succeeds after cancel', async () => {
+    const claimClient = createMockClient([
+      {},
+      { rows: [{ ...baseJob, type: 'test_handler' }] },
+      { rows: [] },
+      {},
+      {},
+      {},
+    ]);
+    const successClient = createMockClient([{}, { rows: [{ status: 'cancelled' }] }, {}]);
+    const handler = mock.fn(async () => ({ delivered: true }));
+    const publishJobEvent = mock.fn(async () => {});
+    const logEvent = mock.fn(async () => {});
+
+    const { processJob } = createWorker({
+      pool: createMockPool(claimClient, successClient),
+      handlers: { test_handler: handler },
+      publishJobEvent,
+      logEvent,
+      resolveDlqForJob: mock.fn(async () => {}),
+    });
+
+    await processJob(baseJob);
+
+    assert.equal(handler.mock.calls.length, 1);
+    assert.equal(findQuery(successClient, /status\s*=\s*'completed'/), undefined);
+    assert.equal(publishJobEvent.mock.calls[1].arguments[0].status, 'cancelled');
+    const cancelledLog = logEvent.mock.calls.find(
+      call => call.arguments[1].metadata?.result_discarded === true
+    );
+    assert.ok(cancelledLog);
   });
 });

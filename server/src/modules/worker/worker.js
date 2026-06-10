@@ -108,10 +108,35 @@ export function createWorker(deps = {}) {
     }
   }
 
+  // Let in-flight handlers finish; if the job was cancelled while running, keep
+  // cancelled — discard the result, skip recurring, and do not resolve DLQ.
   async function recordSuccess(locked, result) {
     const client = await db.connect();
     try {
       await client.query('BEGIN');
+
+      const { rows: [current] } = await client.query(
+        `SELECT status FROM jobs WHERE id = $1 FOR UPDATE`,
+        [locked.id]
+      );
+
+      if (current?.status === 'cancelled') {
+        await log(client, {
+          jobId:    locked.id,
+          event:    'job.cancelled',
+          level:    'info',
+          message:  'Handler finished after cancellation; result discarded',
+          metadata: { result_discarded: true },
+        });
+
+        await client.query('COMMIT');
+        publish({ status: 'cancelled', job_id: locked.id, type: locked.type }).catch(() => {});
+        winston.info('Job remains cancelled after handler finished', {
+          job_id: locked.id,
+          type:   locked.type,
+        });
+        return;
+      }
 
       await client.query(
         `UPDATE jobs
@@ -152,6 +177,24 @@ export function createWorker(deps = {}) {
     const client = await db.connect();
     try {
       await client.query('BEGIN');
+
+      const { rows: [current] } = await client.query(
+        `SELECT status FROM jobs WHERE id = $1 FOR UPDATE`,
+        [job.id]
+      );
+
+      if (current?.status === 'cancelled') {
+        await log(client, {
+          jobId:    job.id,
+          event:    'job.cancelled',
+          level:    'info',
+          message:  'Handler failed after cancellation; not retrying',
+          metadata: { error: err.message },
+        });
+
+        await client.query('COMMIT');
+        return;
+      }
 
       if (newCount >= job.max_retries) {
         await client.query(
