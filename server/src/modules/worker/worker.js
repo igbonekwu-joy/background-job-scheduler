@@ -74,7 +74,7 @@ export function createWorker(deps = {}) {
       const unmet = deps.filter(d => d.status !== 'completed');
       if (unmet.length) {
         await client.query('ROLLBACK');
-        winston.debug('Job held: dependencies unmet', {
+        winston.info('Job held: dependencies unmet', {
           job_id: locked.id,
           waiting_on: unmet.map(d => d.id),
         });
@@ -196,7 +196,8 @@ export function createWorker(deps = {}) {
         return;
       }
 
-      if (newCount >= job.max_retries) {
+      // max_retries = number of retries allowed (default 3 → 4 total runs, 3 backoff delays)
+      if (newCount > job.max_retries) {
         await client.query(
           `INSERT INTO dead_letter_queue (job_id, job_snapshot, failure_reason)
            VALUES ($1, $2, $3)`,
@@ -204,8 +205,10 @@ export function createWorker(deps = {}) {
         );
 
         await client.query(
-          `UPDATE jobs SET status = 'failed', error_message = $1 WHERE id = $2`,
-          [err.message, job.id]
+          `UPDATE jobs
+           SET    status = 'failed', error_message = $1, retry_count = $2
+           WHERE  id = $3`,
+          [err.message, newCount, job.id]
         );
 
         await log(client, {

@@ -256,12 +256,34 @@ describe('recordFailure', () => {
     assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
   });
 
+  it('schedules third retry with ~25s backoff before DLQ', async () => {
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}]);
+    const logEvent = mock.fn(async () => {});
+    const publishJobEvent = mock.fn(async () => {});
+    const job = { ...baseJob, max_retries: 3, retry_count: 2 };
+    const err = new Error('still failing');
+
+    const { recordFailure } = createWorker({
+      pool: createMockPool(client),
+      logEvent,
+      publishJobEvent,
+      backoffMs: () => 25000,
+    });
+
+    await recordFailure(job, err);
+
+    const retryUpdate = findQuery(client, /status\s*=\s*'pending'/);
+    assert.equal(retryUpdate.params[0], 3);
+    assert.ok(Math.abs(new Date(retryUpdate.params[1]).getTime() - (Date.now() + 25000)) < 50);
+    assert.equal(findQuery(client, /INSERT INTO dead_letter_queue/), undefined);
+  });
+
   it('sends job to DLQ when max retries are exhausted', async () => {
     const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
-    const job = { ...baseJob, max_retries: 2, retry_count: 1 };
+    const job = { ...baseJob, max_retries: 2, retry_count: 2 };
     const err = new Error('permanent failure');
 
     const { recordFailure } = createWorker({
