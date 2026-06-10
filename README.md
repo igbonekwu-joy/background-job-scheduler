@@ -213,7 +213,7 @@ const es = new EventSource('http://localhost:5000/api/events');
 
 es.addEventListener('job.event', (e) => {
   const { job_id, status, retry_count } = JSON.parse(e.data);
-  // update your UI
+  // update UI
 });
 ```
 
