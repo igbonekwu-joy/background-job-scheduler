@@ -11,7 +11,7 @@
     "worker": "node src/modules/worker/index.js",
     "dev:worker": "nodemon src/modules/worker/index.js",
     "benchmark": "node src/modules/scripts/benchmark.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test src/modules/worker/worker.test.js"
   },
   "keywords": [],
   "author": "",
