@@ -153,7 +153,7 @@ All responses follow the shape `{ success: boolean, data: ... }`.
 | `GET` | `/api/jobs/:id` | Get a single job with its dependencies |
 | `GET` | `/api/jobs/:id/logs` | Get structured event logs for a job |
 | `PATCH` | `/api/jobs/:id/cancel` | Cancel a pending or processing job (see [Cancellation](#cancellation)) |
-| `GET` | `/api/stats` | Job counts by status + unresolved DLQ count |
+| `GET` | `/api/jobs/stats` | Job counts by status + unresolved DLQ count |
 
 #### POST /api/jobs
 
