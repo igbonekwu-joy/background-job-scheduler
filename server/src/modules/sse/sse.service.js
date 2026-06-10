@@ -1,27 +1,49 @@
-import emitter from "../../utils/emitter.js";
 import { fetchStats } from "../jobs/jobs.service.js";
+import { startJobEventListener } from "../../utils/jobEvents.js";
 
 const clients = new Set();
 
-emitter.on('job.event', (data) => {
-  const payload = `event: job.event\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of clients) client.write(payload);
-});
+function writeEvent(res, eventName, data) {
+  try {
+    res.write(`event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`);
+  } catch {
+    clients.delete(res);
+  }
+}
+
+function broadcastJobEvent(data) {
+  for (const client of clients) {
+    writeEvent(client, 'job.event', data);
+  }
+
+  fetchStats()
+    .then((stats) => {
+      for (const client of clients) {
+        writeEvent(client, 'stats', stats.data.stats);
+      }
+    })
+    .catch(() => {});
+}
+
+startJobEventListener(broadcastJobEvent);
 
 export const fetchEvents = async (req, res) => {
     res.setHeader('Content-Type',  'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection',    'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // stops Nginx from buffering SSE
-    res.flushHeaders();
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
     
-    // Send current stats the moment the client connects
     const stats = await fetchStats();
-    res.write(`event: stats\ndata: ${JSON.stringify(stats.data.stats)}\n\n`);
+    writeEvent(res, 'stats', stats.data.stats);
     
-    // Keep connection alive with a heartbeat every 15s
     const heartbeat = setInterval(() => {
+      try {
         res.write(': heartbeat\n\n');
+      } catch {
+        clearInterval(heartbeat);
+        clients.delete(res);
+      }
     }, 15_000);
     
     clients.add(res);
@@ -31,10 +53,3 @@ export const fetchEvents = async (req, res) => {
         clients.delete(res);
     });
 };
-
-// export const broadcast = (eventName, data) => {
-//   const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
-//   for (const client of clients) {
-//     client.write(payload);
-//   }
-// }

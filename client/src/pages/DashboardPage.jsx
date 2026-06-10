@@ -7,7 +7,7 @@ export default function DashboardPage({ jobs, live = false, sseStats = null, dlq
   const [fetchState, setFetchState] = useState(() => (live ? 'skipped' : 'loading'));
 
   const jobCounts = useMemo(() => {
-    const c = { pending: 0, running: 0, completed: 0, failed: 0, dead: 0 };
+    const c = { pending: 0, processing: 0, completed: 0, failed: 0, dead: 0 };
     jobs.forEach(j => { c[j.status] = (c[j.status] || 0) + 1; });
     return c;
   }, [jobs]);

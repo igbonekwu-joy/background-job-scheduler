@@ -8,3 +8,11 @@ export function apiUrl(path) {
   const route = path.startsWith('/') ? path : `/${path}`;
   return base ? `${base}${route}` : route;
 }
+
+/** SSE must be same-origin in dev so the Vite proxy can stream events reliably. */
+export function sseUrl(path = '/api/events') {
+  if (import.meta.env.DEV) {
+    return path.startsWith('/') ? path : `/${path}`;
+  }
+  return apiUrl(path);
+}

@@ -6,7 +6,7 @@ import { logEvent  } from '../jobs/jobs.service.js';
 import { checkDlqThreshold } from '../dlq/dlq.service.js';
 import pool from '../../config/database.js';
 import logger from '../../config/logger.js';
-import emitter from '../../utils/emitter.js';
+import { publishJobEvent } from '../../utils/jobEvents.js';
 
 logger();
 
@@ -36,7 +36,7 @@ async function scheduleNextRun(client, job) {
     `INSERT INTO jobs
        (type, payload, priority, effective_priority,
         scheduled_at, run_at, recurring_interval, max_retries)
-     VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [job.type, job.payload, job.priority, job.priority, next, next, job.recurring_interval, job.max_retries]
   );
   winston.info('Recurring job re-scheduled', { original: job.id, next_run: next });
@@ -103,7 +103,7 @@ async function processJob(job) {
       metadata: { retry_count: locked.retry_count },
     });
 
-    emitter.emit('job.event', { status: 'processing', job_id: locked.id, type: locked.type });
+    publishJobEvent({ status: 'processing', job_id: locked.id, type: locked.type }).catch(() => {});
 
     // ── 4. Run handler (outside transaction — handlers can be slow) ───────────
     const handler = HANDLERS[locked.type];
@@ -132,7 +132,7 @@ async function processJob(job) {
 
       if (locked.recurring_interval) await scheduleNextRun(pool, locked);
 
-      emitter.emit('job.event', { status: 'completed', job_id: locked.id, type: locked.type });
+      publishJobEvent({ status: 'completed', job_id: locked.id, type: locked.type }).catch(() => {});
       winston.info('Job completed', { job_id: locked.id, type: locked.type });
     } catch (err) {
       await pool.query('ROLLBACK');
@@ -169,9 +169,7 @@ async function processJob(job) {
           metadata: { error: err.message, retry_count: newCount },
         });
 
-        await pool.query('COMMIT');
-
-        emitter.emit('job.event', { status: 'failed', job_id: job.id, type: job.type });
+        publishJobEvent({ status: 'failed', job_id: job.id, type: job.type }).catch(() => {});
         winston.warn('Job sent to DLQ', { job_id: job.id, type: job.type });
 
         // Check alert threshold (reads DB, no transaction needed)
@@ -202,9 +200,7 @@ async function processJob(job) {
           metadata: { error: err.message, delay_ms: delay, retry_count: newCount },
         });
 
-        await pool.query('COMMIT');
-
-        emitter.emit('job.event', { status: 'pending', job_id: job.id, type: job.type, retry_count: newCount, retry_at: retryAt });
+        publishJobEvent({ status: 'pending', job_id: job.id, type: job.type, retry_count: newCount, retry_at: retryAt }).catch(() => {});
         winston.info('Job retry scheduled', { job_id: job.id, attempt: newCount, retry_at: retryAt, delay_ms: delay });
       }
 

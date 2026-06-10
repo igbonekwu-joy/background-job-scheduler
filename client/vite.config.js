@@ -1,24 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const apiUrl = import.meta.env.VITE_API_BASE_URL;
+const apiTarget = 'http://localhost:5000'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/jobs': {
-        target: apiUrl,
+      '/api': {
+        target: apiTarget,
         changeOrigin: true,
-      },
-      '/api/dlq': {
-        target: apiUrl,
-        changeOrigin: true,
-      },
-      '/api/events': {
-        target: apiUrl,
-        changeOrigin: true,
+        timeout: 0,
+        proxyTimeout: 0,
+        configure(proxy) {
+          proxy.on('proxyRes', (proxyRes) => {
+            if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache';
+              proxyRes.headers['connection'] = 'keep-alive';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+            }
+          });
+        },
       },
     },
   },

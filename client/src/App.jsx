@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
 import DLQPage from './pages/DLQPage';
-import { fetchJobs, createJob, mapJobFromApi, applyJobEventUpdate, mapStatsFromApi, fetchJobStats } from './api/jobs';
+import { fetchJobs, createJob, mapJobFromApi, mapStatsFromApi, fetchJobStats } from './api/jobs';
 import { fetchDlqEntries, retryDlqEntry } from './api/dlq';
 import { seedJobs, seedDLQ } from './data/seed';
 import { useJobEvents } from './hooks/useJobEvents';
@@ -43,11 +43,12 @@ export default function App() {
       return;
     }
 
-    setJobs(prev => {
-      const exists = prev.some(job => job.id === event.job_id);
-      if (!exists) return prev;
-      return prev.map(job => applyJobEventUpdate(job, event));
-    });
+    if (event._type === 'connected') {
+      fetchJobs().then(setJobs).catch(() => {});
+      return;
+    }
+
+    fetchJobs().then(setJobs).catch(() => {});
 
     if (event.status === 'failed') {
       fetchDlqEntries().then(setDlq).catch(() => {});

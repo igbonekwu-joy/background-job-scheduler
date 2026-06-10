@@ -17,7 +17,7 @@ const INTERVAL_TO_API = {
 };
 
 export function mapStatusFromApi(status) {
-  if (status === 'processing') return 'running';
+  //if (status === 'processing') return 'processing';
   return status;
 }
 
@@ -44,7 +44,7 @@ export function mapJobFromApi(job) {
 export function mapStatsFromApi(apiStats) {
   const counts = {
     pending: apiStats.pending ?? 0,
-    running: apiStats.processing ?? 0,
+    processing: apiStats.processing ?? 0,
     completed: apiStats.completed ?? 0,
     failed: apiStats.failed ?? 0,
     dead: apiStats.dlq_unresolved ?? 0,
@@ -114,9 +114,13 @@ export async function createJob(jobInput) {
   return mapJobFromApi(data.job);
 }
 
+function sameJobId(a, b) {
+  return String(a).toLowerCase() === String(b).toLowerCase();
+}
+
 /** Apply a SSE job.event payload onto an existing UI job row. */
 export function applyJobEventUpdate(job, event) {
-  if (job.id !== event.job_id) return job;
+  if (!sameJobId(job.id, event.job_id)) return job;
 
   return {
     ...job,

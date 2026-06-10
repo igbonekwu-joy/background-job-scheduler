@@ -27,7 +27,12 @@ app.use(cors({
 app.use(express.json());
 
 app.use(helmet());
-app.use(compression()); 
+app.use(compression({
+  filter(req, res) {
+    if (req.url?.startsWith('/api/events')) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 routes(app);
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { apiUrl } from '../api/config.js';
+import { sseUrl } from '../api/config.js';
 
 export function useJobEvents(onEvent, { enabled = true } = {}) {
   const onEventRef = useRef(onEvent);
@@ -11,7 +11,11 @@ export function useJobEvents(onEvent, { enabled = true } = {}) {
   useEffect(() => {
     if (!enabled) return;
 
-    const es = new EventSource(apiUrl('/api/events'));
+    const es = new EventSource(sseUrl('/api/events'));
+
+    es.addEventListener('open', () => {
+      onEventRef.current({ _type: 'connected' });
+    });
 
     es.addEventListener('job.event', (e) => {
       try {

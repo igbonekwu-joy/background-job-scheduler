@@ -4,7 +4,7 @@ import { validateCreateJob } from "./jobs.validator.js";
 import { StatusCodes } from "http-status-codes";
 
 export const saveJob = async (jobData) => {
-    const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 0, dependencies = [] } = jobData;  
+    const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = jobData;  
     const runAt = scheduled_at || null;
     
     // Validate dependency IDs exist 

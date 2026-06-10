@@ -3,7 +3,7 @@ import { fetchJobById, fetchJobs, saveJob, fetchJobLogs, cancelJobById, fetchSta
 import { validateCreateJob } from "./jobs.validator.js";
 
 export const createJob = async (req, res) => {
-    const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 0, dependencies = [] } = req.body;
+    const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = req.body;
 
     // Validation
     const validated = validateCreateJob({ type, payload, priority, scheduled_at, recurring_interval, max_retries, dependencies });
