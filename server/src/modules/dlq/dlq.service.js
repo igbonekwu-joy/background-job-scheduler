@@ -2,7 +2,7 @@ import { StatusCodes } from "http-status-codes";
 import pool from "../../config/database.js";
 import env from "../../config/env.js";
 import winston from "winston";
-import { sendEmail } from "../handlers/emailHandler.js";
+import { logEvent } from "../jobs/jobs.service.js";
 
 const DLQ_ALERT_THRESHOLD = parseInt(env.DLQ_ALERT_THRESHOLD || '10');
 
@@ -31,7 +31,7 @@ export const getDlqEntryById = async (id) => {
 }
 
 export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
-    const { rows: [entry] } = await SecurityPolicyViolationEvent.query(
+    const { rows: [entry] } = await pool.query(
         `SELECT * FROM dead_letter_queue WHERE id = $1 FOR UPDATE`,
         [dlqId]
     );
