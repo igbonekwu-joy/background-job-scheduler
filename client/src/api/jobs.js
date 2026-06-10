@@ -61,7 +61,7 @@ export function mapStatsFromApi(apiStats) {
 }
 
 export async function fetchJobs() {
-  const res = await fetch(apiUrl('/jobs'));
+  const res = await fetch(apiUrl('/api/jobs'));
   const body = await parseJsonResponse(res);
 
   if (body.status !== 'success' || !Array.isArray(body.jobs)) {
@@ -72,7 +72,7 @@ export async function fetchJobs() {
 }
 
 export async function fetchJobStats() {
-  const res = await fetch(apiUrl('/jobs/stats'));
+  const res = await fetch(apiUrl('/api/jobs/stats'));
   const body = await parseJsonResponse(res);
 
   if (body.status !== 'success' || !body.stats) {
@@ -99,7 +99,7 @@ export async function createJob(jobInput) {
     body.recurring_interval = recurring_interval;
   }
 
-  const res = await fetch(apiUrl('/jobs'), {
+  const res = await fetch(apiUrl('/api/jobs'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

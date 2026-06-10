@@ -17,7 +17,7 @@ export function mapDlqFromApi(entry) {
 }
 
 export async function fetchDlqEntries() {
-  const res = await fetch(apiUrl('/dlq'));
+  const res = await fetch(apiUrl('/api/dlq'));
   const body = await parseJsonResponse(res);
 
   if (!body.success || !Array.isArray(body.data)) {
@@ -28,7 +28,7 @@ export async function fetchDlqEntries() {
 }
 
 export async function retryDlqEntry(id) {
-  const res = await fetch(apiUrl(`/dlq/${id}/retry`), {
+  const res = await fetch(apiUrl(`/api/dlq/${id}/retry`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ retried_by: 'ui' }),

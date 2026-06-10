@@ -6,11 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/jobs': {
+      '/api/jobs': {
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
-      '/dlq': {
+      '/api/dlq': {
         target: 'http://localhost:5000',
         changeOrigin: true,
       },

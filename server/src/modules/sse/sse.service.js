@@ -1,3 +1,4 @@
+import emitter from "../../utils/emitter.js";
 import { fetchStats } from "../jobs/jobs.service.js";
 
 const clients = new Set();

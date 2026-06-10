@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /sse:
+ * /api/events:
  *   get:
  *     summary: Subscribe to real-time job events
  *     tags: [Server Side Events]

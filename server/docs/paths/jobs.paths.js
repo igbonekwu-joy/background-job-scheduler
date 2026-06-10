@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /jobs/stats:
+ * /api/jobs/stats:
  *   get:
  *     summary: Get job statistics
  *     tags: [Jobs]
@@ -11,7 +11,7 @@
 
 /**
  * @swagger
- * /jobs:
+ * /api/jobs:
  *   get:
  *     summary: List jobs with optional filtering and pagination
  *     tags: [Jobs]
@@ -19,7 +19,7 @@
  *       - in: query
  *         name: status
  *         schema:
- *           $ref: '#/components/schemas/JobStatus'
+ *           $ref: '#/components/schemas/api/jobstatus'
  *       - in: query
  *         name: limit
  *         schema:
@@ -37,7 +37,7 @@
 
 /**
  * @swagger
- * /jobs:
+ * /api/jobs:
  *   post:
  *     summary: Create a new job
  *     tags: [Jobs]
@@ -60,7 +60,7 @@
 
 /**
  * @swagger
- * /jobs/{id}:
+ * /api/jobs/{id}:
  *   get:
  *     summary: Get a job by ID
  *     tags: [Jobs]
@@ -80,7 +80,7 @@
 
 /**
  * @swagger
- * /jobs/{id}/logs:
+ * /api/jobs/{id}/logs:
  *   get:
  *     summary: Get execution logs for a job
  *     tags: [Jobs]
@@ -105,7 +105,7 @@
 
 /**
  * @swagger
- * /jobs/{id}/cancel:
+ * /api/jobs/{id}/cancel:
  *   patch:
  *     summary: Cancel a pending or processing job
  *     tags: [Jobs]

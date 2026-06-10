@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /dlq:
+ * /api/dlq:
  *   get:
  *     summary: List Dead Letter Queue entries
  *     tags: [Dead Letter Queue]
@@ -23,7 +23,7 @@
 
 /**
  * @swagger
- * /dlq/{id}:
+ * /api/dlq/{id}:
  *   get:
  *     summary: Get a single DLQ entry
  *     tags: [Dead Letter Queue]
@@ -43,7 +43,7 @@
 
 /**
  * @swagger
- * /dlq/{id}/retry:
+ * /api/dlq/{id}/retry:
  *   post:
  *     summary: Re-queue a failed job from the DLQ
  *     tags: [Dead Letter Queue]
