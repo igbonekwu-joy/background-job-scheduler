@@ -14,7 +14,7 @@ export default function CreateJobModal({ onClose, onCreate }) {
     setForm(f => ({ ...f, [field]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
 
@@ -48,8 +48,8 @@ export default function CreateJobModal({ onClose, onCreate }) {
       payload: parsedPayload,
     };
 
-    onCreate(job);
-    onClose();
+    const ok = await onCreate(job);
+    if (ok !== false) onClose();
   }
 
   function handleBackdropClick(e) {
@@ -103,13 +103,12 @@ export default function CreateJobModal({ onClose, onCreate }) {
 
           <div className="field">
             <label htmlFor="interval">Repeat interval (optional)</label>
-            <input
-              id="interval"
-              type="text"
-              placeholder="e.g. 15m, 1h"
-              value={form.interval}
-              onChange={e => update('interval', e.target.value)}
-            />
+            <select id="interval" value={form.interval} onChange={e => update('interval', e.target.value)}>
+              <option value="">None</option>
+              <option value="every_1_minute">Every 1 minute</option>
+              <option value="every_5_minutes">Every 5 minutes</option>
+              <option value="every_1_hour">Every 1 hour</option>
+            </select>
           </div>
 
           <div className="field field-wide">

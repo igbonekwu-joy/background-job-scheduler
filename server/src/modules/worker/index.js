@@ -6,6 +6,7 @@ import { logEvent  } from '../jobs/jobs.service.js';
 import { checkDlqThreshold } from '../dlq/dlq.service.js';
 import pool from '../../config/database.js';
 import logger from '../../config/logger.js';
+import emitter from '../../utils/emitter.js';
 
 logger();
 
@@ -102,6 +103,8 @@ async function processJob(job) {
       metadata: { retry_count: locked.retry_count },
     });
 
+    emitter.emit('job.event', { status: 'processing', job_id: locked.id, type: locked.type });
+
     // ── 4. Run handler (outside transaction — handlers can be slow) ───────────
     const handler = HANDLERS[locked.type];
     if (!handler) throw new Error(`No handler registered for type: "${locked.type}"`);
@@ -129,6 +132,7 @@ async function processJob(job) {
 
       if (locked.recurring_interval) await scheduleNextRun(pool, locked);
 
+      emitter.emit('job.event', { status: 'completed', job_id: locked.id, type: locked.type });
       winston.info('Job completed', { job_id: locked.id, type: locked.type });
     } catch (err) {
       await pool.query('ROLLBACK');
@@ -137,7 +141,7 @@ async function processJob(job) {
 
   } catch (err) {
 
-    // ── 5b. Failure ───────────────────────────────────────────────────────────
+    // ── 5b. Failure
     await pool.query('ROLLBACK').catch(() => {});
 
     try {
@@ -145,7 +149,7 @@ async function processJob(job) {
       winston.warn('Job failed', { job_id: job.id, attempt: newCount, error: err.message });
 
       if (newCount >= job.max_retries) {
-        // ── Exhausted → DLQ ──────────────────────────────────────────────────
+        // ── Exhausted → DLQ
         await pool.query(
           `INSERT INTO dead_letter_queue (job_id, job_snapshot, failure_reason)
            VALUES ($1, $2, $3)`,
@@ -166,13 +170,15 @@ async function processJob(job) {
         });
 
         await pool.query('COMMIT');
+
+        emitter.emit('job.event', { status: 'failed', job_id: job.id, type: job.type });
         winston.warn('Job sent to DLQ', { job_id: job.id, type: job.type });
 
         // Check alert threshold (reads DB, no transaction needed)
         await checkDlqThreshold();
 
       } else {
-        // ── Schedule retry with backoff ───────────────────────────────────────
+        // ── Schedule retry with backoff 
         const delay   = backoffMs(newCount);
         const retryAt = new Date(Date.now() + delay).toISOString();
 
@@ -197,6 +203,8 @@ async function processJob(job) {
         });
 
         await pool.query('COMMIT');
+
+        emitter.emit('job.event', { status: 'pending', job_id: job.id, type: job.type, retry_count: newCount, retry_at: retryAt });
         winston.info('Job retry scheduled', { job_id: job.id, attempt: newCount, retry_at: retryAt, delay_ms: delay });
       }
 
@@ -208,7 +216,7 @@ async function processJob(job) {
   }
 }
 
-// ─── POLL LOOP ────────────────────────────────────────────────────────────────
+// ─── POLL LOOP
 function poll() {
   const job = scheduler.next(); // remove from heap
 

@@ -3,7 +3,7 @@ import StatusPill from '../components/StatusPill';
 import CreateJobModal from '../components/CreateJobModal';
 import { PRIORITY_LABEL, fmtTime } from '../data/seed';
 
-export default function JobsPage({ jobs, onCreate }) {
+export default function JobsPage({ jobs, onCreate, sourceHint = '' }) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -11,7 +11,7 @@ export default function JobsPage({ jobs, onCreate }) {
       <div className="page-head">
         <h1>Jobs</h1>
         <div className="page-head-actions">
-          <span className="page-sub mono">{jobs.length} records</span>
+          <span className="page-sub mono">{jobs.length} records{sourceHint}</span>
           <button className="btn-primary" onClick={() => setShowModal(true)}>
             + Create job
           </button>

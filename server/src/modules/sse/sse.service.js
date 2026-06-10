@@ -2,6 +2,11 @@ import { fetchStats } from "../jobs/jobs.service.js";
 
 const clients = new Set();
 
+emitter.on('job.event', (data) => {
+  const payload = `event: job.event\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of clients) client.write(payload);
+});
+
 export const fetchEvents = async (req, res) => {
     res.setHeader('Content-Type',  'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -26,9 +31,9 @@ export const fetchEvents = async (req, res) => {
     });
 };
 
-export const broadcast = (eventName, data) => {
-  const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of clients) {
-    client.write(payload);
-  }
-}
+// export const broadcast = (eventName, data) => {
+//   const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+//   for (const client of clients) {
+//     client.write(payload);
+//   }
+// }

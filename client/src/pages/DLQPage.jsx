@@ -1,11 +1,13 @@
 import { PRIORITY_LABEL, fmtTime } from '../data/seed';
 
-export default function DLQPage({ entries, onRetry }) {
+export default function DLQPage({ entries, onRetry, sourceHint = '' }) {
   return (
     <div className="page">
       <div className="page-head">
         <h1>Dead letter queue</h1>
-        <span className="page-sub mono">{entries.length} jobs need attention</span>
+        <span className="page-sub mono">
+          {entries.length} jobs need attention{sourceHint}
+        </span>
       </div>
 
       {entries.length === 0 ? (
@@ -16,7 +18,7 @@ export default function DLQPage({ entries, onRetry }) {
             <div className="dlq-card" key={entry.id}>
               <div className="dlq-head">
                 <div>
-                  <span className="mono dlq-id">{entry.id}</span>
+                  <span className="mono dlq-id">{entry.job_id ?? entry.id}</span>
                   <span className="dlq-type">{entry.type}</span>
                 </div>
                 <button className="retry-btn" onClick={() => onRetry(entry.id)}>

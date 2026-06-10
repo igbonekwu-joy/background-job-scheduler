@@ -3,6 +3,7 @@ export const STATUS_META = {
   running:   { label: 'running',   color: '#58A6FF' },
   completed: { label: 'completed', color: '#3FB950' },
   failed:    { label: 'failed',    color: '#F85149' },
+  cancelled: { label: 'cancelled', color: '#7a768a' },
   dead:      { label: 'dead',      color: '#8B949E' },
 };
 
