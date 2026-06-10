@@ -28,6 +28,10 @@ jobs:
           npm run lint
           npm run build
 
-      - name: Install server dependencies
+      - name: Install and test server
         working-directory: server
-        run: npm ci
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+        run: |
+          npm ci
+          npm test
