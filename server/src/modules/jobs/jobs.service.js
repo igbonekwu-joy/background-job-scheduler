@@ -1,6 +1,7 @@
 import winston from "winston";
 import pool from "../../config/database.js";
 import { StatusCodes } from "http-status-codes";
+import { publishJobEvent } from "../../utils/jobEvents.js";
 
 export const saveJob = async (jobData) => {
     const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = jobData;
@@ -46,6 +47,7 @@ export const saveJob = async (jobData) => {
         });
 
         await client.query('COMMIT');
+        publishJobEvent({ status: 'pending', job_id: job.id, type: job.type }).catch(() => {});
         winston.info(`Job created: { job_id: ${job.id}, type: ${type}, priority: ${priority}, scheduled_at: ${scheduled_at} }`);
         return { statusCode: StatusCodes.CREATED, data: { status: 'success', message: 'Job created successfully', job } };
     } catch (err) {
@@ -156,6 +158,7 @@ export const cancelJobById = async (id) => {
         });
 
         await client.query('COMMIT');
+        publishJobEvent({ status: 'cancelled', job_id: updated.id, type: updated.type }).catch(() => {});
         winston.info(`Job cancelled: { job_id: ${id}, previous_status: ${job.status} }`);
         return { statusCode: StatusCodes.OK, data: { status: 'success', message: 'Job cancelled successfully', job: updated } };
     } catch (err) {
