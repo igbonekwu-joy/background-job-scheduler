@@ -37,7 +37,7 @@ export default function Sidebar({ view, onNavigate, dlqCount }) {
     <aside className="sidebar">
       <div className="sidebar-brand">
         <span className="brand-dot" />
-        <span className="brand-name">queuectl</span>
+        <span className="brand-name">Job Scheduler</span>
       </div>
 
       <nav className="sidebar-nav">
