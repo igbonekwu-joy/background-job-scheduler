@@ -3,6 +3,7 @@ import pool from "../../config/database.js";
 import env from "../../config/env.js";
 import winston from "winston";
 import { logEvent } from "../jobs/jobs.service.js";
+import { sendEmail } from "../handlers/emailHandler.js";
 
 const DLQ_ALERT_THRESHOLD = parseInt(env.DLQ_ALERT_THRESHOLD || '10');
 
@@ -87,11 +88,20 @@ export const checkDlqThreshold = async () => {
   );
  
   if (count >= DLQ_ALERT_THRESHOLD) {
-    winston.error('DLQ ALERT: threshold exceeded — engineering action required', {
-      unresolved_count: count,
-      threshold:        DLQ_ALERT_THRESHOLD,
-      alert_type:       'dlq_overflow',
-      // trigger email handler
+    // winston.error('DLQ ALERT: threshold exceeded — engineering action required', {
+    //   unresolved_count: count,
+    //   threshold:        DLQ_ALERT_THRESHOLD,
+    //   alert_type:       'dlq_overflow',
+    // });
+
+    await sendEmail({
+      id: 'dlq-alert',
+      payload: {
+        to: process.env.DLQ_ALERT_EMAIL || 'engineering@dilamme.io',
+        subject: `DLQ alert: ${count} unresolved entries (threshold ${DLQ_ALERT_THRESHOLD})`,
+      },
+    }).catch((err) => {
+      winston.warn('DLQ alert email failed', { error: err.message });
     });
   }
   return count;
