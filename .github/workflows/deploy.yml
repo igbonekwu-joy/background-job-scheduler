@@ -1,0 +1,62 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Build client
+        working-directory: client
+        env:
+          # same-origin: nginx serves the SPA and proxies /api
+          VITE_API_BASE_URL: ''
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package release
+        run: |
+          mkdir -p release/client/dist release/server
+          cp -r client/dist/. release/client/dist/
+          rsync -a --exclude node_modules --exclude .env server/ release/server/
+          cp -r deploy release/
+
+      - name: Upload release tarball
+        run: tar czf release.tar.gz -C release .
+
+      - name: Copy to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: release.tar.gz
+          target: /tmp
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            mkdir -p /var/www/queuectl
+            tar xzf /tmp/release.tar.gz -C /var/www/queuectl
+            rm -f /tmp/release.tar.gz
+            bash /var/www/queuectl/deploy/deploy.sh
