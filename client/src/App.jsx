@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
 import DLQPage from './pages/DLQPage';
-import { fetchJobs, createJob, mapJobFromApi, mapStatsFromApi, fetchJobStats } from './api/jobs';
+import { fetchJobs, createJob, cancelJob, mapJobFromApi, mapStatsFromApi, fetchJobStats } from './api/jobs';
 import { fetchDlqEntries, retryDlqEntry } from './api/dlq';
 import { seedJobs, seedDLQ } from './data/seed';
 import { useJobEvents } from './hooks/useJobEvents';
@@ -78,6 +78,24 @@ export default function App() {
     }
   }
 
+  async function handleCancel(id) {
+    const match = job => String(job.id).toLowerCase() === String(id).toLowerCase();
+
+    if (dataSource !== 'live') {
+      setJobs(prev => prev.map(j => match(j) ? { ...j, status: 'cancelled' } : j));
+      showToast(`Cancelled ${id}`);
+      return;
+    }
+
+    try {
+      const job = await cancelJob(id);
+      setJobs(prev => prev.map(j => match(j) ? job : j));
+      showToast(`Cancelled ${job.id}`);
+    } catch (err) {
+      showToast(err.message || 'Failed to cancel job');
+    }
+  }
+
   async function handleRetry(id) {
     if (dataSource !== 'live') {
       const entry = dlq.find(e => e.id === id);
@@ -129,7 +147,7 @@ export default function App() {
           />
         )}
         {view === 'jobs' && (
-          <JobsPage jobs={jobs} onCreate={handleCreate} sourceHint={sourceHint} />
+          <JobsPage jobs={jobs} onCreate={handleCreate} onCancel={handleCancel} sourceHint={sourceHint} />
         )}
         {view === 'dlq' && (
           <DLQPage entries={dlq} onRetry={handleRetry} sourceHint={sourceHint} />

@@ -601,6 +601,24 @@ tbody tr:hover {
   transform: translateY(-1px);
 }
 
+.cancel-btn {
+  background: transparent;
+  border: 1px solid var(--text-faint);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 92, 106, 0.1);
+  border-color: var(--c-failed);
+  color: var(--c-failed);
+}
+
 .dlq-error {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;

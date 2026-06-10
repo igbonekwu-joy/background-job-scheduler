@@ -92,6 +92,21 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
   }
 }
 
+/** Mark the latest manually-retried DLQ entry resolved after its job completes. */
+export const resolveDlqForJob = async (client, jobId) => {
+  await client.query(
+    `UPDATE dead_letter_queue
+     SET resolved = TRUE, resolved_at = NOW()
+     WHERE id = (
+       SELECT id FROM dead_letter_queue
+       WHERE job_id = $1 AND resolved = FALSE AND retried_at IS NOT NULL
+       ORDER BY retried_at DESC
+       LIMIT 1
+     )`,
+    [jobId]
+  );
+};
+
 export const checkDlqThreshold = async () => {
   const { rows: [{ count }] } = await pool.query(
     `SELECT COUNT(*)::int AS count FROM dead_letter_queue WHERE resolved = FALSE`

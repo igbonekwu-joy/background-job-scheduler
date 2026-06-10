@@ -114,6 +114,20 @@ export async function createJob(jobInput) {
   return mapJobFromApi(data.job);
 }
 
+export async function cancelJob(id) {
+  const res = await fetch(apiUrl(`/api/jobs/${id}/cancel`), {
+    method: 'PATCH',
+  });
+
+  const data = await parseJsonResponse(res);
+
+  if (data.status !== 'success' || !data.job) {
+    throw new Error(data.message || 'Failed to cancel job');
+  }
+
+  return mapJobFromApi(data.job);
+}
+
 function sameJobId(a, b) {
   return String(a).toLowerCase() === String(b).toLowerCase();
 }

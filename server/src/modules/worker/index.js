@@ -3,7 +3,7 @@ import winston   from 'winston';
 import scheduler from '../scheduler/scheduler.js';
 import { sendEmail } from '../handlers/emailHandler.js';
 import { logEvent  } from '../jobs/jobs.service.js';
-import { checkDlqThreshold } from '../dlq/dlq.service.js';
+import { checkDlqThreshold, resolveDlqForJob } from '../dlq/dlq.service.js';
 import pool from '../../config/database.js';
 import logger from '../../config/logger.js';
 import { publishJobEvent } from '../../utils/jobEvents.js';
@@ -128,6 +128,8 @@ async function recordSuccess(locked, result) {
     });
 
     if (locked.recurring_interval) await scheduleNextRun(client, locked);
+
+    await resolveDlqForJob(client, locked.id);
 
     await client.query('COMMIT');
     publishJobEvent({ status: 'completed', job_id: locked.id, type: locked.type }).catch(() => {});
