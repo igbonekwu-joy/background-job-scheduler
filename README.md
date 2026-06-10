@@ -328,6 +328,8 @@ POST /api/jobs  { "type": "send_email", "payload": { "to": "a@b.com", "subject":
 
 Jobs 2 and 3 will stay `pending` until their dependency chain resolves.
 
+Circular dependencies are rejected at create time (HTTP 422). For example, if job B already depends on job A, creating job A with `dependencies: ["B"]` returns `Dependency cycle detected` — those jobs would otherwise wait on each other forever.
+
 ---
 
 ## Scheduling algorithms

@@ -2,6 +2,7 @@ import winston from "winston";
 import pool from "../../config/database.js";
 import { StatusCodes } from "http-status-codes";
 import { publishJobEvent } from "../../utils/jobEvents.js";
+import { findDependencyCycle } from "./dependencyCycle.js";
 
 export const saveJob = async (jobData) => {
     const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = jobData;
@@ -30,6 +31,17 @@ export const saveJob = async (jobData) => {
             RETURNING *`,
             [type, payload, priority, priority, scheduled_at, runAt, recurring_interval, max_retries]
         );
+
+        if (dependencies.length > 0) {
+            const cyclicDep = await findDependencyCycle(client, job.id, dependencies);
+            if (cyclicDep) {
+                await client.query('ROLLBACK');
+                return {
+                    statusCode: StatusCodes.UNPROCESSABLE_ENTITY,
+                    data: { status: 'error', message: 'Dependency cycle detected' },
+                };
+            }
+        }
 
         for (const depId of dependencies) {
             await client.query(

@@ -12,7 +12,7 @@ export const createJob = async (req, res) => {
     }
 
     const result = await saveJob(validated);
-    res.status(StatusCodes.CREATED).json(result.data);
+    res.status(result.statusCode).json(result.data);
 }
 
 export const getJobs = async (req, res) => {
