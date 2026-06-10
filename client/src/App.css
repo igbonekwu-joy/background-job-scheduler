@@ -579,6 +579,123 @@ tbody tr:hover {
   padding: 8px 12px;
 }
 
+/* Logs */
+
+.logs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.logs-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.logs-filter span {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.logs-filter select {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.logs-error {
+  margin-bottom: 14px;
+}
+
+.logs-table-wrap {
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+}
+
+.logs-table .log-time {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.logs-table .log-job {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.log-event {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  background: var(--accent-soft);
+  color: #c4b5fd;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.log-level {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.log-level-info { color: var(--c-running); }
+.log-level-warn { color: var(--c-pending); }
+.log-level-error { color: var(--c-failed); }
+
+.log-message {
+  font-size: 13px;
+  max-width: 360px;
+  line-height: 1.45;
+}
+
+.log-metadata-cell {
+  min-width: 72px;
+}
+
+.log-metadata summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--accent);
+  user-select: none;
+}
+
+.log-metadata pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  max-width: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-metadata-empty {
+  color: var(--text-faint);
+}
+
+.log-row-error {
+  background: rgba(255, 92, 106, 0.04);
+}
+
+.log-row-warn {
+  background: rgba(245, 166, 35, 0.03);
+}
+
 /* DLQ */
 
 .empty-state {

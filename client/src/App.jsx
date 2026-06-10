@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
 import DLQPage from './pages/DLQPage';
+import LogsPage from './pages/LogsPage';
 import { fetchJobs, createJob, cancelJob, mapJobFromApi, mapStatsFromApi, fetchJobStats } from './api/jobs';
 import { fetchDlqEntries, retryDlqEntry } from './api/dlq';
 import { seedJobs, seedDLQ } from './data/seed';
@@ -17,6 +18,7 @@ export default function App() {
   const [toast, setToast] = useState('');
 
   const [liveStats, setLiveStats] = useState(null);
+  const [logsRefresh, setLogsRefresh] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +51,7 @@ export default function App() {
     }
 
     fetchJobs().then(setJobs).catch(() => {});
+    setLogsRefresh(n => n + 1);
 
     if (event.status === 'failed') {
       fetchDlqEntries().then(setDlq).catch(() => {});
@@ -148,6 +151,14 @@ export default function App() {
         )}
         {view === 'jobs' && (
           <JobsPage jobs={jobs} onCreate={handleCreate} onCancel={handleCancel} sourceHint={sourceHint} />
+        )}
+        {view === 'logs' && (
+          <LogsPage
+            jobs={jobs}
+            live={dataSource === 'live'}
+            refreshToken={logsRefresh}
+            sourceHint={sourceHint}
+          />
         )}
         {view === 'dlq' && (
           <DLQPage entries={dlq} onRetry={handleRetry} sourceHint={sourceHint} />

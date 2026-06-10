@@ -38,6 +38,72 @@ export const seedDLQ = [
   },
 ];
 
+export const seedLogs = [
+  {
+    id: 'log-001',
+    job_id: 'job_8f2a',
+    event: 'job.created',
+    level: 'info',
+    message: 'Job created: type=send_email, priority=1',
+    metadata: { type: 'send_email', priority: 1, dependency_count: 0 },
+    created_at: '2026-06-10T07:58:11Z',
+  },
+  {
+    id: 'log-002',
+    job_id: 'job_8f2a',
+    event: 'job.started',
+    level: 'info',
+    message: 'Worker started send_email',
+    metadata: { retry_count: 0 },
+    created_at: '2026-06-10T08:00:02Z',
+  },
+  {
+    id: 'log-003',
+    job_id: 'job_8f2a',
+    event: 'job.completed',
+    level: 'info',
+    message: 'Job completed successfully',
+    metadata: { result: { to: 'maria@dilamme.io', message_id: '<job_8f2a@dilamme.io>' } },
+    created_at: '2026-06-10T08:00:03Z',
+  },
+  {
+    id: 'log-004',
+    job_id: 'job_91bd',
+    event: 'job.created',
+    level: 'info',
+    message: 'Job created: type=send_email, priority=2',
+    metadata: { type: 'send_email', priority: 2 },
+    created_at: '2026-06-10T08:04:40Z',
+  },
+  {
+    id: 'log-005',
+    job_id: 'job_91bd',
+    event: 'job.started',
+    level: 'info',
+    message: 'Worker started send_email',
+    metadata: { retry_count: 1 },
+    created_at: '2026-06-10T08:05:01Z',
+  },
+  {
+    id: 'log-006',
+    job_id: 'job_b711',
+    event: 'job.retry',
+    level: 'warn',
+    message: 'Attempt 2 failed. Retrying at 2026-06-10T07:52:00Z.',
+    metadata: { error: 'SMTP 421: service temporarily unavailable', delay_ms: 5200, retry_count: 2 },
+    created_at: '2026-06-10T07:51:55Z',
+  },
+  {
+    id: 'log-007',
+    job_id: 'job_b711',
+    event: 'job.failed',
+    level: 'error',
+    message: 'Exhausted 3 retries. Sent to DLQ.',
+    metadata: { error: 'SMTP 421: service temporarily unavailable', retry_count: 3 },
+    created_at: '2026-06-10T07:55:42Z',
+  },
+];
+
 export function fmtTime(iso) {
   return new Date(iso).toLocaleString(undefined, {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',

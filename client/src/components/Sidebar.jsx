@@ -1,6 +1,7 @@
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'jobs', label: 'Jobs', icon: 'list' },
+  { key: 'logs', label: 'Logs', icon: 'logs' },
   { key: 'dlq', label: 'DLQ', icon: 'alert' },
 ];
 
@@ -21,6 +22,14 @@ const ICONS = {
       <line x1="5" y1="3" x2="15" y2="3" stroke="currentColor" strokeWidth="1.4" />
       <line x1="5" y1="8" x2="15" y2="8" stroke="currentColor" strokeWidth="1.4" />
       <line x1="5" y1="13" x2="15" y2="13" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  ),
+  logs: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="1.5" width="12" height="13" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
+      <line x1="5" y1="5" x2="11" y2="5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="5" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="5" y1="11" x2="9" y2="11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   ),
   alert: (
