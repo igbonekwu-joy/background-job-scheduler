@@ -75,19 +75,40 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([loadJobsPage(1), loadDlqPage(1), fetchJobStats()])
-      .then(([, , stats]) => {
-        if (!cancelled) {
-          setLiveStats(stats);
-          setDataSource('live');
-        }
+    Promise.all([
+      fetchJobs({ page: 1, limit: DEFAULT_JOBS_PAGE_SIZE }),
+      fetchDlqEntries({ page: 1, limit: DEFAULT_DLQ_PAGE_SIZE }),
+      fetchJobStats(),
+    ])
+      .then(([jobsResult, dlqResult, stats]) => {
+        if (cancelled) return;
+        jobsPageRef.current = jobsResult.page;
+        setJobs(jobsResult.jobs);
+        setJobsPagination({
+          page: jobsResult.page,
+          limit: jobsResult.limit,
+          total: jobsResult.total,
+          total_jobs: jobsResult.total_jobs,
+          links: jobsResult.links,
+        });
+        dlqPageRef.current = dlqResult.page;
+        setDlq(dlqResult.entries);
+        setDlqPagination({
+          page: dlqResult.page,
+          limit: dlqResult.limit,
+          total: dlqResult.total,
+          total_dlq: dlqResult.total_dlq,
+          links: dlqResult.links,
+        });
+        setLiveStats(stats);
+        setDataSource('live');
       })
       .catch(() => {
         if (!cancelled) setDataSource('local');
       });
 
     return () => { cancelled = true; };
-  }, [loadJobsPage, loadDlqPage]);
+  }, []);
 
   useJobEvents((event) => {
     if (event._type === 'stats') {

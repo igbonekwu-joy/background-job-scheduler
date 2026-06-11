@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchJobs } from '../api/jobs';
 
 export default function CreateJobModal({ jobs = [], live = false, onClose, onCreate }) {
-  const [dependencyJobs, setDependencyJobs] = useState(jobs);
+  const [fetchedJobs, setFetchedJobs] = useState(null);
   const [form, setForm] = useState({
     type: 'send_email',
     priority: 2,
@@ -14,22 +14,21 @@ export default function CreateJobModal({ jobs = [], live = false, onClose, onCre
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!live) {
-      setDependencyJobs(jobs);
-      return;
-    }
+    if (!live) return;
 
     let cancelled = false;
     fetchJobs({ page: 1, limit: 100 })
       .then(result => {
-        if (!cancelled) setDependencyJobs(result.jobs);
+        if (!cancelled) setFetchedJobs(result.jobs);
       })
       .catch(() => {
-        if (!cancelled) setDependencyJobs(jobs);
+        if (!cancelled) setFetchedJobs(jobs);
       });
 
     return () => { cancelled = true; };
   }, [live, jobs]);
+
+  const dependencyJobs = live ? (fetchedJobs ?? jobs) : jobs;
 
   function update(field, value) {
     setForm(f => ({ ...f, [field]: value }));
