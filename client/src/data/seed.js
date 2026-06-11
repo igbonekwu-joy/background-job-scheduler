@@ -20,6 +20,8 @@ export const seedJobs = [
 export const seedDLQ = [
   {
     id: 'job_b711',
+    job_id: 'job_b711',
+    name: 'Weekly digest',
     type: 'send_email',
     priority: 1,
     retry_count: 3,
@@ -29,6 +31,8 @@ export const seedDLQ = [
   },
   {
     id: 'job_c220',
+    job_id: 'job_c220',
+    name: 'Tmp cleanup',
     type: 'cleanup',
     priority: 3,
     retry_count: 5,

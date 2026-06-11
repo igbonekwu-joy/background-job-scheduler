@@ -9,6 +9,7 @@ export function mapDlqFromApi(entry) {
   return {
     id: entry.id,
     job_id: entry.job_id,
+    name: snap.name || entry.job_name || '',
     type: snap.type ?? 'unknown',
     priority: snap.priority ?? 2,
     retry_count: snap.retry_count ?? 0,

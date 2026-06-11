@@ -22,10 +22,14 @@ export const getDlqEntries = async ({
 
     const offset = (safePage - 1) * safeLimit;
 
+    const resolvedFilter = includeResolved ? '' : 'WHERE dlq.resolved = FALSE';
+
     const { rows } = await pool.query(
-        `SELECT * FROM dead_letter_queue
-        ${where}
-        ORDER BY failed_at DESC
+        `SELECT dlq.*, j.name AS job_name
+        FROM dead_letter_queue dlq
+        LEFT JOIN jobs j ON j.id = dlq.job_id
+        ${resolvedFilter}
+        ORDER BY dlq.failed_at DESC
         LIMIT $1 OFFSET $2`,
         [safeLimit, offset]
     );

@@ -87,7 +87,9 @@ export default function DLQPage({
             <div className="dlq-card" key={entry.id}>
               <div className="dlq-head">
                 <div>
-                  <span className="mono dlq-id">{entry.job_id ?? entry.id}</span>
+                  <span className="dlq-id" title={entry.job_id ?? entry.id}>
+                    {entry.name || entry.job_id || entry.id}
+                  </span>
                   <span className="dlq-type">{entry.type}</span>
                 </div>
                 <button className="retry-btn" onClick={() => handleRetry(entry.id)}>
