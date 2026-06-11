@@ -14,7 +14,12 @@ import {
   fetchJobStats,
   DEFAULT_JOBS_PAGE_SIZE,
 } from './api/jobs';
-import { fetchDlqEntries, retryDlqEntry, DEFAULT_DLQ_PAGE_SIZE } from './api/dlq';
+import {
+  fetchDlqEntries,
+  retryDlqEntry,
+  removeDlqEntriesForJob,
+  DEFAULT_DLQ_PAGE_SIZE,
+} from './api/dlq';
 import { seedJobs, seedDLQ } from './data/seed';
 import { useJobEvents } from './hooks/useJobEvents';
 
@@ -113,11 +118,18 @@ export default function App() {
   useJobEvents((event) => {
     if (event._type === 'stats') {
       setLiveStats(mapStatsFromApi(event.stats));
+      if (typeof event.stats?.dlq_unresolved === 'number') {
+        setDlqPagination(prev => ({
+          ...prev,
+          total_dlq: event.stats.dlq_unresolved,
+        }));
+      }
       return;
     }
 
     if (event._type === 'connected') {
       loadJobsPage(jobsPageRef.current).catch(() => {});
+      loadDlqPage(dlqPageRef.current).catch(() => {});
       return;
     }
 
@@ -125,6 +137,11 @@ export default function App() {
     setLogsRefresh(n => n + 1);
 
     if (event.status === 'failed') {
+      loadDlqPage(dlqPageRef.current).catch(() => {});
+    }
+
+    if (event.status === 'completed' && event.job_id && event.dlq_resolved) {
+      setDlq(prev => removeDlqEntriesForJob(prev, event.job_id));
       loadDlqPage(dlqPageRef.current).catch(() => {});
     }
   }, { enabled: dataSource === 'live' });

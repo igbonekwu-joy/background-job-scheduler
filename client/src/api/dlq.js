@@ -3,6 +3,15 @@ import { parseJsonResponse } from './http.js';
 
 export const DEFAULT_DLQ_PAGE_SIZE = 10;
 
+function sameJobId(a, b) {
+  return String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+/** Drop DLQ rows for a job that was resolved (e.g. completed after DLQ retry). */
+export function removeDlqEntriesForJob(entries, jobId) {
+  return entries.filter(entry => !sameJobId(entry.job_id ?? entry.id, jobId));
+}
+
 export function mapDlqFromApi(entry) {
   const snap = entry.job_snapshot ?? {};
 

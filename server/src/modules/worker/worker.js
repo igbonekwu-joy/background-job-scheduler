@@ -183,10 +183,15 @@ export function createWorker(deps = {}) {
 
       if (locked.recurring_interval) await scheduleNextRun(client, locked);
 
-      await resolveDlq(client, locked.id);
+      const dlqResolved = await resolveDlq(client, locked.id);
 
       await client.query('COMMIT');
-      publish({ status: 'completed', job_id: locked.id, type: locked.type }).catch(() => {});
+      publish({
+        status: 'completed',
+        job_id: locked.id,
+        type: locked.type,
+        dlq_resolved: dlqResolved > 0,
+      }).catch(() => {});
       winston.info('Job completed', { job_id: locked.id, type: locked.type });
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});

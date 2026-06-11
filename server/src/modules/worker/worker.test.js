@@ -151,8 +151,32 @@ describe('recordSuccess', () => {
       status: 'completed',
       job_id: 'job-1',
       type: 'send_email',
+      dlq_resolved: false,
     });
     assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
+  });
+
+  it('publishes dlq_resolved when a retried DLQ job completes', async () => {
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
+    const resolveDlqForJob = mock.fn(async () => 1);
+    const publishJobEvent = mock.fn(async () => {});
+    const locked = { ...baseJob, id: 'job-1', type: 'send_email' };
+
+    const { recordSuccess } = createWorker({
+      pool: createMockPool(client),
+      logEvent: mock.fn(async () => {}),
+      resolveDlqForJob,
+      publishJobEvent,
+    });
+
+    await recordSuccess(locked, { ok: true });
+
+    assert.deepEqual(publishJobEvent.mock.calls[0].arguments[0], {
+      status: 'completed',
+      job_id: 'job-1',
+      type: 'send_email',
+      dlq_resolved: true,
+    });
   });
 
   it('keeps cancelled status and discards result when job was cancelled while running', async () => {

@@ -148,7 +148,7 @@ export const upsertDlqEntry = async (client, { jobId, jobSnapshot, failureReason
 
 /** Mark the latest manually-retried DLQ entry resolved after its job completes. */
 export const resolveDlqForJob = async (client, jobId) => {
-  await client.query(
+  const { rowCount } = await client.query(
     `UPDATE dead_letter_queue
      SET resolved = TRUE, resolved_at = NOW()
      WHERE id = (
@@ -159,6 +159,7 @@ export const resolveDlqForJob = async (client, jobId) => {
      )`,
     [jobId]
   );
+  return rowCount;
 };
 
 export const checkDlqThreshold = async () => {
