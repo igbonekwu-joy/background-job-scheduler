@@ -42,20 +42,6 @@ export function createWorker(deps = {}) {
     winston.info('Recurring job re-scheduled', { original: job.id, next_run: next });
   }
 
-  async function persistLog(entry) {
-    const logClient = await db.connect();
-    try {
-      await logClient.query('BEGIN');
-      await log(logClient, entry);
-      await logClient.query('COMMIT');
-    } catch (err) {
-      await logClient.query('ROLLBACK').catch(() => {});
-      throw err;
-    } finally {
-      logClient.release();
-    }
-  }
-
   async function claimJob(jobId) {
     const client = await db.connect();
     try {
@@ -87,23 +73,30 @@ export function createWorker(deps = {}) {
 
       const unmet = deps.filter(d => d.status !== 'completed');
       if (unmet.length) {
+        const blocked = unmet.filter(d => d.status === 'failed' || d.status === 'cancelled');
+        if (blocked.length) {
+          const reason = `Blocked by ${blocked.length === 1 ? 'dependency' : 'dependencies'}: ${blocked.map(d => d.id).join(', ')}`;
+          await client.query(
+            `UPDATE jobs SET status = 'failed', error_message = $1 WHERE id = $2`,
+            [reason, locked.id]
+          );
+          await log(client, {
+            jobId:    locked.id,
+            event:    'job.failed',
+            level:    'error',
+            message:  reason,
+            metadata: { blocked_by: blocked.map(d => d.id) },
+          });
+          await client.query('COMMIT');
+          publish({ status: 'failed', job_id: locked.id, type: locked.type }).catch(() => {});
+          winston.warn('Job failed: dependency not satisfiable', {
+            job_id: locked.id,
+            blocked_by: blocked.map(d => d.id),
+          });
+          return null;
+        }
+
         await client.query('ROLLBACK');
-
-        const waitingOn = unmet.map(d => d.id);
-        await persistLog({
-          jobId:    locked.id,
-          event:    'job.held',
-          level:    'info',
-          message:  `Job held: ${unmet.length} dependenc${unmet.length === 1 ? 'y' : 'ies'} unmet`,
-          metadata: { waiting_on: waitingOn },
-        }).catch((err) => {
-          winston.warn('Failed to log dependency hold', { job_id: locked.id, error: err.message });
-        });
-
-        winston.info('Job held: dependencies unmet', {
-          job_id: locked.id,
-          waiting_on: waitingOn,
-        });
         return null;
       }
 

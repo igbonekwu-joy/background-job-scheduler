@@ -78,17 +78,16 @@ describe('claimJob', () => {
     assert.equal(client.release.mock.calls.length, 1);
   });
 
-  it('returns null when dependencies are unmet', async () => {
+  it('returns null when dependencies are still pending without logging', async () => {
     const claimClient = createMockClient([
       {},
       { rows: [{ ...baseJob, id: 'job-1' }] },
       { rows: [{ id: 'dep-1', status: 'pending' }] },
       {},
     ]);
-    const logClient = createMockClient([{}, {}]);
     const logEvent = mock.fn(async () => {});
     const { claimJob } = createWorker({
-      pool: createMockPool(claimClient, logClient),
+      pool: createMockPool(claimClient),
       logEvent,
     });
 
@@ -96,11 +95,37 @@ describe('claimJob', () => {
 
     assert.equal(result, null);
     assert.equal(claimClient.queries[3].sql, 'ROLLBACK');
-    assert.equal(logEvent.mock.calls.length, 1);
-    assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.held');
-    assert.deepEqual(logEvent.mock.calls[0].arguments[1].metadata.waiting_on, ['dep-1']);
-    assert.equal(logClient.queries[0].sql, 'BEGIN');
-    assert.equal(logClient.queries[1].sql, 'COMMIT');
+    assert.equal(logEvent.mock.calls.length, 0);
+  });
+
+  it('fails job when a dependency failed or was cancelled', async () => {
+    const claimClient = createMockClient([
+      {},
+      { rows: [{ ...baseJob, id: 'job-1', type: 'send_email' }] },
+      { rows: [{ id: 'dep-1', status: 'failed' }] },
+      {},
+      {},
+    ]);
+    const logEvent = mock.fn(async () => {});
+    const publishJobEvent = mock.fn(async () => {});
+    const { claimJob } = createWorker({
+      pool: createMockPool(claimClient),
+      logEvent,
+      publishJobEvent,
+    });
+
+    const result = await claimJob('job-1');
+
+    assert.equal(result, null);
+    assert.match(findQuery(claimClient, /status = 'failed'/).sql, /failed/);
+    assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.failed');
+    assert.deepEqual(logEvent.mock.calls[0].arguments[1].metadata.blocked_by, ['dep-1']);
+    assert.deepEqual(publishJobEvent.mock.calls[0].arguments[0], {
+      status: 'failed',
+      job_id: 'job-1',
+      type: 'send_email',
+    });
+    assert.equal(findQuery(claimClient, /^COMMIT$/).sql, 'COMMIT');
   });
 
   it('claims job and marks it processing when ready', async () => {
