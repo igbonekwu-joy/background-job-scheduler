@@ -12,13 +12,18 @@
  *           default: false
  *         description: Include entries that have already been resolved
  *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 100
+ *           default: 10
  *     responses:
  *       200:
- *         description: DLQ entries returned successfully
+ *         description: Paginated DLQ entries returned successfully
  */
 
 /**

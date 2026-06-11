@@ -14,7 +14,7 @@ import {
   fetchJobStats,
   DEFAULT_JOBS_PAGE_SIZE,
 } from './api/jobs';
-import { fetchDlqEntries, retryDlqEntry } from './api/dlq';
+import { fetchDlqEntries, retryDlqEntry, DEFAULT_DLQ_PAGE_SIZE } from './api/dlq';
 import { seedJobs, seedDLQ } from './data/seed';
 import { useJobEvents } from './hooks/useJobEvents';
 
@@ -35,6 +35,14 @@ export default function App() {
     links: {},
   });
   const jobsPageRef = useRef(1);
+  const dlqPageRef = useRef(1);
+  const [dlqPagination, setDlqPagination] = useState({
+    page: 1,
+    limit: DEFAULT_DLQ_PAGE_SIZE,
+    total: 0,
+    total_dlq: 0,
+    links: {},
+  });
 
   const loadJobsPage = useCallback(async (page = 1) => {
     const result = await fetchJobs({ page, limit: DEFAULT_JOBS_PAGE_SIZE });
@@ -50,13 +58,26 @@ export default function App() {
     return result;
   }, []);
 
+  const loadDlqPage = useCallback(async (page = 1) => {
+    const result = await fetchDlqEntries({ page, limit: DEFAULT_DLQ_PAGE_SIZE });
+    dlqPageRef.current = result.page;
+    setDlq(result.entries);
+    setDlqPagination({
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      total_dlq: result.total_dlq,
+      links: result.links,
+    });
+    return result;
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([loadJobsPage(1), fetchDlqEntries(), fetchJobStats()])
-      .then(([, liveDlq, stats]) => {
+    Promise.all([loadJobsPage(1), loadDlqPage(1), fetchJobStats()])
+      .then(([, , stats]) => {
         if (!cancelled) {
-          setDlq(liveDlq);
           setLiveStats(stats);
           setDataSource('live');
         }
@@ -66,7 +87,7 @@ export default function App() {
       });
 
     return () => { cancelled = true; };
-  }, [loadJobsPage]);
+  }, [loadJobsPage, loadDlqPage]);
 
   useJobEvents((event) => {
     if (event._type === 'stats') {
@@ -83,7 +104,7 @@ export default function App() {
     setLogsRefresh(n => n + 1);
 
     if (event.status === 'failed') {
-      fetchDlqEntries().then(setDlq).catch(() => {});
+      loadDlqPage(dlqPageRef.current).catch(() => {});
     }
   }, { enabled: dataSource === 'live' });
 
@@ -152,7 +173,7 @@ export default function App() {
 
     try {
       const result = await retryDlqEntry(id);
-      setDlq(prev => prev.filter(e => e.id !== id));
+      await loadDlqPage(dlqPageRef.current);
       setJobs(prev => [mapJobFromApi(result.job), ...prev]);
       showToast(`Requeued ${result.job.id}`);
     } catch (err) {
@@ -167,7 +188,11 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} onNavigate={setView} dlqCount={dlq.length} />
+      <Sidebar
+        view={view}
+        onNavigate={setView}
+        dlqCount={dataSource === 'live' ? dlqPagination.total_dlq : dlq.length}
+      />
 
       <main className="app-content">
         {view === 'dashboard' && (
@@ -175,7 +200,7 @@ export default function App() {
             jobs={jobs}
             live={dataSource === 'live'}
             sseStats={liveStats}
-            dlqCount={dlq.length}
+            dlqCount={dataSource === 'live' ? dlqPagination.total_dlq : dlq.length}
           />
         )}
         {view === 'jobs' && (
@@ -198,7 +223,14 @@ export default function App() {
           />
         )}
         {view === 'dlq' && (
-          <DLQPage entries={dlq} onRetry={handleRetry} sourceHint={sourceHint} />
+          <DLQPage
+            entries={dlq}
+            pagination={dlqPagination}
+            live={dataSource === 'live'}
+            onPageChange={loadDlqPage}
+            onRetry={handleRetry}
+            sourceHint={sourceHint}
+          />
         )}
       </main>
 

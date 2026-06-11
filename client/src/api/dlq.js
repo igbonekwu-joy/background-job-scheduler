@@ -1,6 +1,8 @@
 import { apiUrl } from './config.js';
 import { parseJsonResponse } from './http.js';
 
+export const DEFAULT_DLQ_PAGE_SIZE = 10;
+
 export function mapDlqFromApi(entry) {
   const snap = entry.job_snapshot ?? {};
 
@@ -16,15 +18,32 @@ export function mapDlqFromApi(entry) {
   };
 }
 
-export async function fetchDlqEntries() {
-  const res = await fetch(apiUrl('/api/dlq'));
+export async function fetchDlqEntries({
+  page = 1,
+  limit = DEFAULT_DLQ_PAGE_SIZE,
+  includeResolved = false,
+} = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (includeResolved) params.set('include_resolved', 'true');
+
+  const res = await fetch(apiUrl(`/api/dlq?${params}`));
   const body = await parseJsonResponse(res);
 
-  if (!body.success || !Array.isArray(body.data)) {
+  if (body.status !== 'success' || !Array.isArray(body.data)) {
     throw new Error('Unexpected DLQ response');
   }
 
-  return body.data.map(mapDlqFromApi);
+  return {
+    page: body.page,
+    limit: body.limit,
+    total: body.total,
+    total_dlq: body.total_dlq,
+    links: body.links ?? {},
+    entries: body.data.map(mapDlqFromApi),
+  };
 }
 
 export async function retryDlqEntry(id) {

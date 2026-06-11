@@ -244,7 +244,25 @@ Response:
 | `GET` | `/api/dlq/:id` | Get a single DLQ entry with full error details |
 | `POST` | `/api/dlq/:id/retry` | Manually retry a DLQ job |
 
-`GET /api/dlq` accepts `?include_resolved=true` to include already-resolved entries.
+`GET /api/dlq` accepts `?include_resolved=true&page=1&limit=10`.
+
+Response:
+
+```json
+{
+  "status": "success",
+  "page": 1,
+  "limit": 10,
+  "total": 2,
+  "total_dlq": 25,
+  "links": {
+    "self": "https://host/api/dlq?page=1&limit=10",
+    "next": "https://host/api/dlq?page=2&limit=10",
+    "prev": null
+  },
+  "data": []
+}
+```
 
 `POST /api/dlq/:id/retry` accepts an optional body `{ "retried_by": "your@email.com" }`.
 

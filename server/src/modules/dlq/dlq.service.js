@@ -4,19 +4,55 @@ import env from "../../config/env.js";
 import winston from "winston";
 import { logEvent } from "../jobs/jobs.service.js";
 import { sendEmail } from "../handlers/emailHandler.js";
+import { buildPageLinks } from "../../utils/pagination.js";
 
 const DLQ_ALERT_THRESHOLD = parseInt(env.DLQ_ALERT_THRESHOLD || '10');
 
-export const getDlqEntries = async (options) => {
-    const { rows } = await pool.query(
-        `SELECT * FROM dead_letter_queue
-        ${options.includeResolved ? '' : 'WHERE resolved = FALSE'}
-        ORDER BY failed_at DESC
-        LIMIT $1`,
-        [options.limit]
+export const getDlqEntries = async ({
+    includeResolved = false,
+    page = 1,
+    limit = 10,
+    linkBase = '/api/dlq',
+}) => {
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const safePage = Math.max(1, page);
+    const where = includeResolved ? '' : 'WHERE resolved = FALSE';
+
+    const { rows: [{ total_dlq }] } = await pool.query(
+        `SELECT COUNT(*)::int AS total_dlq FROM dead_letter_queue ${where}`
     );
 
-    return { statusCode: StatusCodes.OK, data: { success: true, count: rows.length, data: rows } };
+    const total = total_dlq === 0 ? 0 : Math.ceil(total_dlq / safeLimit);
+    const offset = (safePage - 1) * safeLimit;
+
+    const { rows } = await pool.query(
+        `SELECT * FROM dead_letter_queue
+        ${where}
+        ORDER BY failed_at DESC
+        LIMIT $1 OFFSET $2`,
+        [safeLimit, offset]
+    );
+
+    const filters = {};
+    if (includeResolved) filters.include_resolved = 'true';
+
+    return {
+        statusCode: StatusCodes.OK,
+        data: {
+            status: 'success',
+            page: safePage,
+            limit: safeLimit,
+            total,
+            total_dlq,
+            links: buildPageLinks(linkBase, {
+                page: safePage,
+                limit: safeLimit,
+                total,
+                filters,
+            }),
+            data: rows,
+        },
+    };
 }
 
 export const getDlqEntryById = async (id) => {

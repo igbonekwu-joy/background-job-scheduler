@@ -1,10 +1,17 @@
 import { getDlqEntries, getDlqEntryById, retryFromDlq } from "./dlq.service.js";
 
 export const getQueue = async (req, res) => {
+    const { page, limit } = req.query;
     const includeResolved = req.query.include_resolved === 'true';
+    const parsedLimit = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 10;
+    const parsedPage = page ? Math.max(1, parseInt(page, 10)) : 1;
+    const linkBase = `${req.protocol}://${req.get('host')}${req.baseUrl}`;
+
     const entries = await getDlqEntries({
         includeResolved,
-        limit: req.query.limit ? parseInt(req.query.limit) : 100,
+        page: parsedPage,
+        limit: parsedLimit,
+        linkBase,
     });
 
     res.status(entries.statusCode).json(entries.data);

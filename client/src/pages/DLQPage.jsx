@@ -1,12 +1,46 @@
+import { useState } from 'react';
+import { DEFAULT_DLQ_PAGE_SIZE } from '../api/dlq';
 import { PRIORITY_LABEL, fmtTime } from '../data/seed';
 
-export default function DLQPage({ entries, onRetry, sourceHint = '' }) {
+const EMPTY_PAGINATION = {
+  page: 1,
+  limit: DEFAULT_DLQ_PAGE_SIZE,
+  total: 0,
+  total_dlq: 0,
+  links: {},
+};
+
+export default function DLQPage({
+  entries,
+  pagination = EMPTY_PAGINATION,
+  live = false,
+  onPageChange,
+  onRetry,
+  sourceHint = '',
+}) {
+  const [pageLoading, setPageLoading] = useState(false);
+  const { page, total, total_dlq, links } = pagination;
+
+  const recordLabel = live
+    ? `${total_dlq} total · page ${page} of ${Math.max(total, 1)}`
+    : `${entries.length} jobs need attention`;
+
+  async function goToPage(nextPage) {
+    if (!live || !onPageChange || nextPage < 1 || nextPage > total) return;
+    setPageLoading(true);
+    try {
+      await onPageChange(nextPage);
+    } finally {
+      setPageLoading(false);
+    }
+  }
+
   return (
     <div className="page">
       <div className="page-head">
         <h1>Dead letter queue</h1>
         <span className="page-sub mono">
-          {entries.length} jobs need attention{sourceHint}
+          {recordLabel}{sourceHint}
         </span>
       </div>
 
@@ -38,6 +72,30 @@ export default function DLQPage({ entries, onRetry, sourceHint = '' }) {
             </div>
           ))}
         </div>
+      )}
+
+      {live && total > 1 && (
+        <nav className="pagination" aria-label="DLQ pagination">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={!links.prev || pageLoading}
+            onClick={() => goToPage(page - 1)}
+          >
+            Previous
+          </button>
+          <span className="pagination-status mono">
+            Page {page} of {total}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={!links.next || pageLoading}
+            onClick={() => goToPage(page + 1)}
+          >
+            Next
+          </button>
+        </nav>
       )}
     </div>
   );
