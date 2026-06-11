@@ -102,7 +102,7 @@ describe('claimJob', () => {
     const claimClient = createMockClient([
       {},
       { rows: [{ ...baseJob, id: 'job-1', type: 'send_email' }] },
-      { rows: [{ id: 'dep-1', status: 'failed' }] },
+      { rows: [{ id: 'dep-1', name: 'Upstream job', status: 'failed' }] },
       {},
       {},
     ]);
@@ -119,6 +119,7 @@ describe('claimJob', () => {
     assert.equal(result, null);
     assert.match(findQuery(claimClient, /status = 'failed'/).sql, /failed/);
     assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.failed');
+    assert.match(logEvent.mock.calls[0].arguments[1].message, /Upstream job/);
     assert.deepEqual(logEvent.mock.calls[0].arguments[1].metadata.blocked_by, ['dep-1']);
     assert.deepEqual(publishJobEvent.mock.calls[0].arguments[0], {
       status: 'failed',

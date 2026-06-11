@@ -64,18 +64,20 @@ export function createWorker(deps = {}) {
       const locked = rows[0];
 
       const { rows: deps } = await client.query(
-        `SELECT j.id, j.status
+        `SELECT j.id, j.name, j.status
          FROM   job_dependencies d
          JOIN   jobs j ON j.id = d.depends_on
          WHERE  d.job_id = $1`,
         [locked.id]
       );
 
+      const depLabel = (d) => d.name || d.id;
+
       const unmet = deps.filter(d => d.status !== 'completed');
       if (unmet.length) {
         const blocked = unmet.filter(d => d.status === 'failed' || d.status === 'cancelled');
         if (blocked.length) {
-          const reason = `Blocked by ${blocked.length === 1 ? 'dependency' : 'dependencies'}: ${blocked.map(d => d.id).join(', ')}`;
+          const reason = `Blocked by ${blocked.length === 1 ? 'dependency' : 'dependencies'}: ${blocked.map(depLabel).join(', ')}`;
           await client.query(
             `UPDATE jobs SET status = 'failed', error_message = $1 WHERE id = $2`,
             [reason, locked.id]
