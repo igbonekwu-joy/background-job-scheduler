@@ -144,20 +144,94 @@ export const fetchJobById = async (id) => {
     return { statusCode: StatusCodes.OK, data: { status: 'success', job } };
 }
 
-export const fetchJobLogs = async (jobId, { limit = 200 }) => {
+function buildLogsWhere({ job_id, event, level }) {
+    const conditions = [];
+    const params = [];
+
+    if (job_id) {
+        params.push(job_id);
+        conditions.push(`job_id = $${params.length}`);
+    }
+    if (event) {
+        params.push(event);
+        conditions.push(`event = $${params.length}`);
+    }
+    if (level) {
+        params.push(level);
+        conditions.push(`level = $${params.length}`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    return { where, params };
+}
+
+export const fetchAllJobLogs = async ({
+    job_id,
+    event,
+    level,
+    page = 1,
+    limit = 20,
+    linkBase = '/api/jobs/all/logs',
+}) => {
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const safePage = Math.max(1, page);
+    const { where, params } = buildLogsWhere({ job_id, event, level });
+
+    const { rows: [{ total_logs }] } = await pool.query(
+        `SELECT COUNT(*)::int AS total_logs FROM job_logs ${where}`,
+        params
+    );
+
+    const total = total_logs === 0 ? 0 : Math.ceil(total_logs / safeLimit);
+    const offset = (safePage - 1) * safeLimit;
+    const listParams = [...params, safeLimit, offset];
+
+    const { rows } = await pool.query(
+        `SELECT * FROM job_logs
+            ${where}
+            ORDER BY created_at DESC
+            LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+        listParams
+    );
+
+    const filters = {};
+    if (job_id) filters.job_id = job_id;
+    if (event) filters.event = event;
+    if (level) filters.level = level;
+
+    return {
+        statusCode: StatusCodes.OK,
+        data: {
+            status: 'success',
+            page: safePage,
+            limit: safeLimit,
+            total,
+            total_logs,
+            links: buildPageLinks(linkBase, {
+                page: safePage,
+                limit: safeLimit,
+                total,
+                filters,
+            }),
+            data: rows,
+        },
+    };
+};
+
+export const fetchJobLogs = async (jobId, { page = 1, limit = 20, event, level, linkBase }) => {
     const job = await fetchJobById(jobId);
     if (job.data.status === 'error') {
         return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: 'Job not found' } };
     }
 
-    const { rows } = await pool.query(
-        `SELECT * FROM job_logs
-            WHERE job_id = $1
-            ORDER BY created_at ASC
-            LIMIT $2`,
-        [jobId, limit]
-    );
-    return { statusCode: StatusCodes.OK, data: { status: 'success', logs: rows } };
+    return fetchAllJobLogs({
+        job_id: jobId,
+        event,
+        level,
+        page,
+        limit,
+        linkBase: linkBase ?? `/api/jobs/${jobId}/logs`,
+    });
 }
 
 export const cancelJobById = async (id) => {

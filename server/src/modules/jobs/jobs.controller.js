@@ -1,5 +1,5 @@
 import { StatusCodes } from "http-status-codes";
-import { fetchJobById, fetchJobs, saveJob, fetchJobLogs, cancelJobById, fetchStats } from "./jobs.service.js";
+import { fetchJobById, fetchJobs, saveJob, fetchAllJobLogs, fetchJobLogs, cancelJobById, fetchStats } from "./jobs.service.js";
 import { validateCreateJob } from "./jobs.validator.js";
 
 export const createJob = async (req, res) => {
@@ -38,8 +38,28 @@ export const getJobById = async (req, res) => {
 }
 
 export const getJobLogs = async (req, res) => {
+    const { event, level, page, limit } = req.query;
+    const parsedLimit = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 20;
+    const parsedPage = page ? Math.max(1, parseInt(page, 10)) : 1;
+    const linkBase = `${req.protocol}://${req.get('host')}${req.baseUrl}/${req.params.id}/logs`;
+
+    if (req.params.id === 'all') {
+        const logs = await fetchAllJobLogs({
+            event,
+            level,
+            page: parsedPage,
+            limit: parsedLimit,
+            linkBase,
+        });
+        return res.status(logs.statusCode).json(logs.data);
+    }
+
     const logs = await fetchJobLogs(req.params.id, {
-      limit: req.query.limit ? parseInt(req.query.limit) : 200
+        event,
+        level,
+        page: parsedPage,
+        limit: parsedLimit,
+        linkBase,
     });
 
     res.status(logs.statusCode).json(logs.data);

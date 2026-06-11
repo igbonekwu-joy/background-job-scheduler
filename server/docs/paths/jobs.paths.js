@@ -82,7 +82,7 @@
  * @swagger
  * /api/jobs/{id}/logs:
  *   get:
- *     summary: Get execution logs for a job
+ *     summary: Get paginated execution logs for a job (or all jobs when id is "all")
  *     tags: [Jobs]
  *     parameters:
  *       - in: path
@@ -90,15 +90,29 @@
  *         required: true
  *         schema:
  *           type: string
- *           format: uuid
+ *         description: Job UUID, or "all" for logs across every job
+ *       - in: query
+ *         name: event
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: level
+ *         schema:
+ *           type: string
+ *           enum: [info, warn, error]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 200
+ *           default: 20
  *     responses:
  *       200:
- *         description: Job log entries
+ *         description: Paginated job log entries
  *       404:
  *         description: Job not found
  */

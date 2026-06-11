@@ -153,7 +153,7 @@ All responses follow the shape `{ success: boolean, data: ... }`.
 | `POST` | `/api/jobs` | Create a job |
 | `GET` | `/api/jobs` | List jobs |
 | `GET` | `/api/jobs/:id` | Get a single job with its dependencies |
-| `GET` | `/api/jobs/:id/logs` | Get structured event logs for a job |
+| `GET` | `/api/jobs/:id/logs` | Get paginated event logs for a job (`id=all` for all jobs) |
 | `PATCH` | `/api/jobs/:id/cancel` | Cancel a pending or processing job (see [Cancellation](#cancellation)) |
 | `GET` | `/api/jobs/stats` | Job counts by status + unresolved DLQ count |
 
@@ -202,6 +202,34 @@ Response:
   "links": {
     "self": "https://host/api/jobs?page=1&limit=20",
     "next": "https://host/api/jobs?page=2&limit=20",
+    "prev": null
+  },
+  "data": []
+}
+```
+
+#### GET /api/jobs/:id/logs
+
+Query params: `?event=job.failed&level=error&page=1&limit=20`
+
+Use `id=all` to list logs across every job. For a single job, pass its UUID as `id`.
+
+`event` accepts lifecycle events such as `job.created`, `job.started`, `job.retry`, `job.failed`, `job.cancelled`, `job.completed`.
+
+`level` accepts: `info`, `warn`, `error`
+
+Response:
+
+```json
+{
+  "status": "success",
+  "page": 1,
+  "limit": 20,
+  "total": 3,
+  "total_logs": 42,
+  "links": {
+    "self": "https://host/api/jobs/all/logs?page=1&limit=20",
+    "next": "https://host/api/jobs/all/logs?page=2&limit=20",
     "prev": null
   },
   "data": []

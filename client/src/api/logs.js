@@ -1,6 +1,8 @@
 import { apiUrl } from './config.js';
 import { parseJsonResponse } from './http.js';
 
+export const DEFAULT_LOGS_PAGE_SIZE = 20;
+
 export function mapLogFromApi(log) {
   return {
     id: log.id,
@@ -13,26 +15,36 @@ export function mapLogFromApi(log) {
   };
 }
 
-export async function fetchJobLogs(jobId, { limit = 200 } = {}) {
-  const res = await fetch(apiUrl(`/api/jobs/${jobId}/logs?limit=${limit}`));
-  const body = await parseJsonResponse(res);
-
-  if (body.status !== 'success' || !Array.isArray(body.logs)) {
+function parseLogsResponse(body) {
+  if (body.status !== 'success' || !Array.isArray(body.data)) {
     throw new Error('Unexpected job logs response');
   }
 
-  return body.logs.map(mapLogFromApi);
+  return {
+    logs: body.data.map(mapLogFromApi),
+    page: body.page,
+    limit: body.limit,
+    total: body.total,
+    total_logs: body.total_logs,
+    links: body.links ?? {},
+  };
 }
 
-/** Fetch and merge logs for multiple jobs, newest first. */
-export async function fetchLogsForJobs(jobs, { limitPerJob = 100 } = {}) {
-  const results = await Promise.all(
-    jobs.map(job =>
-      fetchJobLogs(job.id, { limit: limitPerJob }).catch(() => [])
-    )
-  );
+export async function fetchJobLogs(jobId, {
+  page = 1,
+  limit = DEFAULT_LOGS_PAGE_SIZE,
+  event,
+  level,
+} = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (event && event !== 'all') params.set('event', event);
+  if (level && level !== 'all') params.set('level', level);
 
-  return results
-    .flat()
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const id = jobId === 'all' ? 'all' : jobId;
+  const res = await fetch(apiUrl(`/api/jobs/${id}/logs?${params}`));
+  const body = await parseJsonResponse(res);
+  return parseLogsResponse(body);
 }
