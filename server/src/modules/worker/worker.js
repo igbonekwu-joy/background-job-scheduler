@@ -223,7 +223,9 @@ export function createWorker(deps = {}) {
       }
 
       // max_retries = max automatic retries (default 3); DLQ when newCount > max_retries
+      console.log(newCount, job.max_retries);
       if (newCount > job.max_retries) {
+        console.log('max retries reached', newCount, job.max_retries);
         await client.query(
           `INSERT INTO dead_letter_queue (job_id, job_snapshot, failure_reason)
            VALUES ($1, $2, $3)`,

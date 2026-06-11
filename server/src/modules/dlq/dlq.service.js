@@ -3,7 +3,7 @@ import env from "../../config/env.js";
 import winston from "winston";
 import { logEvent } from "../jobs/jobs.service.js";
 import { sendEmail } from "../handlers/emailHandler.js";
-import { NotFoundError } from "../../utils/errors.js";
+import { BadRequestError, NotFoundError } from "../../utils/errors.js";
 
 const DLQ_ALERT_THRESHOLD = parseInt(env.DLQ_ALERT_THRESHOLD || '10');
 
@@ -45,7 +45,11 @@ export const getDlqEntryById = async (id) => {
     return entry;
 }
 
-export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
+export const retryFromDlq = async (dlqId, { retriedBy = 'engineer', payload } = {}) => {
+  if (payload !== undefined && (payload === null || typeof payload !== 'object' || Array.isArray(payload))) {
+    throw new BadRequestError('payload must be a JSON object');
+  }
+
   const client = await pool.connect();
 
   try {
@@ -60,6 +64,10 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
         throw new NotFoundError(`DLQ entry ${dlqId} not found`);
     }
 
+    const jobParams = payload !== undefined
+      ? [entry.job_id, payload]
+      : [entry.job_id];
+
     const { rows: [job] } = await client.query(
       `UPDATE jobs
       SET status        = 'pending',
@@ -68,10 +76,10 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
           run_at        = NOW(),
           scheduled_at  = NOW(),
           started_at    = NULL,
-          completed_at  = NULL
+          completed_at  = NULL${payload !== undefined ? ',\n          payload = $2' : ''}
       WHERE id = $1
       RETURNING *`,
-      [entry.job_id]
+      jobParams
     );
     if (!job) {
         await client.query('ROLLBACK');
@@ -90,7 +98,11 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
       event:   'job.retry',
       level:   'warn',
       message: `Manual retry triggered from DLQ by ${retriedBy}`,
-      metadata: { dlq_id: dlqId, retried_by: retriedBy }
+      metadata: {
+        dlq_id: dlqId,
+        retried_by: retriedBy,
+        ...(payload !== undefined && { payload_updated: true }),
+      }
     });
 
     await client.query('COMMIT');

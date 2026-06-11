@@ -825,7 +825,8 @@ tbody tr:hover {
   color: var(--text);
 }
 
-.dlq-payload pre {
+.dlq-payload pre,
+.dlq-payload-input {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
   background: var(--bg);
@@ -834,6 +835,24 @@ tbody tr:hover {
   padding: 12px;
   margin-top: 8px;
   overflow-x: auto;
+}
+
+.dlq-payload-input {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.dlq-payload-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.dlq-payload-error {
+  margin-top: 8px;
 }
 
 /* Toast */

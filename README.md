@@ -264,7 +264,7 @@ Response:
 }
 ```
 
-`POST /api/dlq/:id/retry` accepts an optional body `{ "retried_by": "your@email.com" }`.
+`POST /api/dlq/:id/retry` accepts an optional body `{ "retried_by": "your@email.com", "payload": { ... } }`. When `payload` is provided, the job is re-queued with that payload instead of the snapshot stored in the DLQ entry.
 
 ### Live updates (SSE)
 

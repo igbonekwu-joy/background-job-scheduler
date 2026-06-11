@@ -46,18 +46,21 @@ export async function fetchDlqEntries({
   };
 }
 
-export async function retryDlqEntry(id) {
+export async function retryDlqEntry(id, { payload } = {}) {
+  const requestBody = { retried_by: 'ui' };
+  if (payload !== undefined) requestBody.payload = payload;
+
   const res = await fetch(apiUrl(`/api/dlq/${id}/retry`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ retried_by: 'ui' }),
+    body: JSON.stringify(requestBody),
   });
 
-  const body = await parseJsonResponse(res);
+  const data = await parseJsonResponse(res);
 
-  if (body.status !== 'success' || !body.job) {
+  if (data.status !== 'success' || !data.job) {
     throw new Error('Unexpected DLQ retry response');
   }
 
-  return body;
+  return data;
 }

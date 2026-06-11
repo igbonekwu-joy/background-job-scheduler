@@ -29,7 +29,8 @@ export const getQueueById = async (req, res) => {
 
 export const retryDlq = async (req, res) => {
     const retriedBy = req.body?.retried_by || 'engineer';
-    const { job, dlqEntry } = await retryFromDlq(req.params.id, retriedBy);
+    const { payload } = req.body ?? {};
+    const { job, dlqEntry } = await retryFromDlq(req.params.id, { retriedBy, payload });
 
     res.status(StatusCodes.OK).json({
         status: 'success',

@@ -170,7 +170,7 @@ export default function App() {
     }
   }
 
-  async function handleRetry(id) {
+  async function handleRetry(id, payload) {
     if (dataSource !== 'live') {
       const entry = dlq.find(e => e.id === id);
       if (!entry) return;
@@ -185,6 +185,7 @@ export default function App() {
           scheduled_time: new Date().toISOString(),
           interval: '-',
           created_time: new Date().toISOString(),
+          payload: payload ?? entry.payload ?? {},
         },
         ...prev,
       ]);
@@ -193,7 +194,7 @@ export default function App() {
     }
 
     try {
-      const result = await retryDlqEntry(id);
+      const result = await retryDlqEntry(id, { payload });
       await loadDlqPage(dlqPageRef.current);
       setJobs(prev => [mapJobFromApi(result.job), ...prev]);
       showToast(`Requeued ${result.job.id}`);

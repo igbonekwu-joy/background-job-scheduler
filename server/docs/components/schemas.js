@@ -54,6 +54,9 @@
  *           type: string
  *           default: engineer
  *           example: engineer
+ *         payload:
+ *           type: object
+ *           description: Optional replacement payload for the re-queued job
  *
  *     ErrorResponse:
  *       type: object
