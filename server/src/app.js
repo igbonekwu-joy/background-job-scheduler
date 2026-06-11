@@ -11,6 +11,7 @@ import compression from 'compression';
 import routes from './routes.js';
 
 const app = express();
+env.NODE_ENV === 'production' && app.set('etag', false);;
 
 const allowedOrigins = env.CLIENT_ORIGIN.split(',').map(origin => origin.trim());
 
