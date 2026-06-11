@@ -82,6 +82,7 @@ export default function JobsPage({
         <table>
           <thead>
             <tr>
+              <th>id</th>
               <th>name</th>
               <th>type</th>
               <th>priority</th>
@@ -98,14 +99,15 @@ export default function JobsPage({
           <tbody>
             {displayJobs.length === 0 ? (
               <tr>
-                <td colSpan={11} className="table-empty">
+                <td colSpan={12} className="table-empty">
                   {search.trim() ? 'No jobs match your search.' : 'No jobs yet.'}
                 </td>
               </tr>
             ) : (
               displayJobs.map(j => (
                 <tr key={j.id}>
-                  <td title={j.id}>{j.name || j.id}</td>
+                  <td className="mono job-id" title={j.id}>{j.id}</td>
+                  <td>{j.name || '—'}</td>
                   <td>{j.type}</td>
                   <td><span className={`prio prio-${j.priority}`}>{PRIORITY_LABEL[j.priority]}</span></td>
                   <td><StatusPill status={j.status} /></td>
