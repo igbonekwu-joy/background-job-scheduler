@@ -256,13 +256,34 @@ describe('recordFailure', () => {
     assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
   });
 
-  it('sends job to DLQ when failure count reaches max_retries', async () => {
+  it('still retries when retry_count is below max_retries', async () => {
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}]);
+    const logEvent = mock.fn(async () => {});
+    const publishJobEvent = mock.fn(async () => {});
+    const job = { ...baseJob, max_retries: 3, retry_count: 2 };
+    const err = new Error('still failing');
+
+    const { recordFailure } = createWorker({
+      pool: createMockPool(client),
+      logEvent,
+      publishJobEvent,
+      backoffMs: () => 25_000,
+    });
+
+    await recordFailure(job, err);
+
+    const retryUpdate = findQuery(client, /status\s*=\s*'pending'/);
+    assert.equal(retryUpdate.params[0], 3);
+    assert.equal(findQuery(client, /INSERT INTO dead_letter_queue/), undefined);
+  });
+
+  it('sends job to DLQ when failure count exceeds max_retries', async () => {
     const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
-    // max_retries=3 → 3 total runs; DLQ on the 3rd failure (retry_count 2 → newCount 3)
-    const job = { ...baseJob, max_retries: 3, retry_count: 2 };
+    // max_retries=3 → DLQ after the 3rd retry fails (retry_count 3 → newCount 4)
+    const job = { ...baseJob, max_retries: 3, retry_count: 3 };
     const err = new Error('still failing');
 
     const { recordFailure } = createWorker({
@@ -285,7 +306,7 @@ describe('recordFailure', () => {
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
-    const job = { ...baseJob, max_retries: 2, retry_count: 1 };
+    const job = { ...baseJob, max_retries: 2, retry_count: 2 };
     const err = new Error('permanent failure');
 
     const { recordFailure } = createWorker({

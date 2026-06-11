@@ -28,6 +28,7 @@ export default function JobsPage({ jobs, onCreate, onCancel, sourceHint = '' }) 
               <th>type</th>
               <th>priority</th>
               <th>status</th>
+              <th>attempts</th>
               <th>retries</th>
               <th>scheduled</th>
               <th>interval</th>
@@ -43,6 +44,7 @@ export default function JobsPage({ jobs, onCreate, onCancel, sourceHint = '' }) 
                 <td><span className={`prio prio-${j.priority}`}>{PRIORITY_LABEL[j.priority]}</span></td>
                 <td><StatusPill status={j.status} /></td>
                 <td className="mono">{j.retry_count}</td>
+                <td className="mono">{j.retry_count > 0 ? j.retry_count - 1 : j.retry_count}</td>
                 <td className="mono">{fmtTime(j.scheduled_time)}</td>
                 <td className="mono">{j.interval}</td>
                 <td className="mono">{fmtTime(j.created_time)}</td>
