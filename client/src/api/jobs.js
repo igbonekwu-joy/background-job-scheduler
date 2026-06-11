@@ -26,6 +26,14 @@ function formatInterval(recurringInterval) {
   return INTERVAL_LABEL[recurringInterval] ?? recurringInterval;
 }
 
+function normalizeDependencies(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  return raw.map((dep) => {
+    if (typeof dep === 'string') return { id: dep, name: '' };
+    return { id: dep.id, name: dep.name ?? '' };
+  });
+}
+
 export function mapJobFromApi(job) {
   return {
     id: job.id,
@@ -38,7 +46,36 @@ export function mapJobFromApi(job) {
     interval: formatInterval(job.recurring_interval),
     created_time: job.created_at,
     payload: job.payload ?? {},
+    dependencies: normalizeDependencies(job.dependencies),
   };
+}
+
+/** Client-side filter for offline/demo job lists. */
+export function filterJobs(jobs, search) {
+  const q = search.trim().toLowerCase();
+  if (!q) return jobs;
+
+  return jobs.filter((job) => {
+    const depText = (job.dependencies ?? [])
+      .map((dep) => `${dep.name} ${dep.id}`.trim())
+      .join(' ');
+
+    return (
+      (job.name || '').toLowerCase().includes(q)
+      || job.type.toLowerCase().includes(q)
+      || job.status.toLowerCase().includes(q)
+      || String(job.id).toLowerCase().includes(q)
+      || depText.toLowerCase().includes(q)
+    );
+  });
+}
+
+export function formatDependencyLabels(dependencies, nameById = new Map()) {
+  if (!dependencies?.length) return '—';
+
+  return dependencies
+    .map((dep) => dep.name || nameById.get(dep.id) || dep.id)
+    .join(', ');
 }
 
 /** Map backend stat keys to the dashboard display model. */
@@ -63,12 +100,13 @@ export function mapStatsFromApi(apiStats) {
 
 const DEFAULT_JOBS_PAGE_SIZE = 20;
 
-export async function fetchJobs({ page = 1, limit = DEFAULT_JOBS_PAGE_SIZE, status } = {}) {
+export async function fetchJobs({ page = 1, limit = DEFAULT_JOBS_PAGE_SIZE, status, search } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
   if (status) params.set('status', status);
+  if (search?.trim()) params.set('search', search.trim());
 
   const res = await fetch(apiUrl(`/api/jobs?${params}`));
   const body = await parseJsonResponse(res);

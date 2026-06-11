@@ -20,10 +20,10 @@ export const createJob = async (req, res) => {
 }
 
 export const getJobs = async (req, res) => {
-    const { status } = req.query;
+    const { status, search } = req.query;
     const { page, limit } = parsePagination(req.query, 20);
 
-    const result = await fetchJobs({ status, page, limit });
+    const result = await fetchJobs({ status, search, page, limit });
 
     res.status(StatusCodes.OK).json(toPaginatedBody({
         rows: result.rows,
@@ -33,6 +33,7 @@ export const getJobs = async (req, res) => {
         countKey: 'total_jobs',
         linkBase: linkBaseFromReq(req),
         status,
+        filters: result.search ? { search: result.search } : {},
     }));
 };
 

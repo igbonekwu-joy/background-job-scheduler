@@ -40,6 +40,7 @@ export default function App() {
     links: {},
   });
   const jobsPageRef = useRef(1);
+  const jobsSearchRef = useRef('');
   const dlqPageRef = useRef(1);
   const [dlqPagination, setDlqPagination] = useState({
     page: 1,
@@ -49,8 +50,12 @@ export default function App() {
     links: {},
   });
 
-  const loadJobsPage = useCallback(async (page = 1) => {
-    const result = await fetchJobs({ page, limit: DEFAULT_JOBS_PAGE_SIZE });
+  const loadJobsPage = useCallback(async (page = 1, search = jobsSearchRef.current) => {
+    const result = await fetchJobs({
+      page,
+      limit: DEFAULT_JOBS_PAGE_SIZE,
+      search: search?.trim() || undefined,
+    });
     jobsPageRef.current = result.page;
     setJobs(result.jobs);
     setJobsPagination({
@@ -249,6 +254,10 @@ export default function App() {
             pagination={jobsPagination}
             live={dataSource === 'live'}
             onPageChange={loadJobsPage}
+            onSearch={(term) => {
+              jobsSearchRef.current = term;
+              loadJobsPage(1, term).catch(() => {});
+            }}
             onCreate={handleCreate}
             onCancel={handleCancel}
             sourceHint={sourceHint}

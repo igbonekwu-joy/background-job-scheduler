@@ -67,35 +67,57 @@ export const saveJob = async (jobData) => {
     }
 }
 
-export const fetchJobs = async ({ status, page = 1, limit = 20 }) => {
-    const safeLimit = Math.min(100, Math.max(1, limit));
-    const safePage = Math.max(1, page);
-
-    const countParams = [];
-    let where = '';
+function buildJobsListWhere({ status, search }) {
+    const conditions = [];
+    const params = [];
 
     if (status) {
-        countParams.push(status);
-        where = `WHERE j.status = $${countParams.length}`;
+        params.push(status);
+        conditions.push(`j.status = $${params.length}`);
     }
+
+    const term = search?.trim();
+    if (term) {
+        params.push(`%${term}%`);
+        const placeholder = `$${params.length}`;
+        conditions.push(`(
+            j.name ILIKE ${placeholder}
+            OR j.type ILIKE ${placeholder}
+            OR j.id::text ILIKE ${placeholder}
+            OR j.status::text ILIKE ${placeholder}
+        )`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    return { where, params };
+}
+
+export const fetchJobs = async ({ status, search, page = 1, limit = 20 }) => {
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const safePage = Math.max(1, page);
+    const { where, params } = buildJobsListWhere({ status, search });
 
     const { rows: [{ total_jobs }] } = await pool.query(
         `SELECT COUNT(*)::int AS total_jobs FROM jobs j ${where}`,
-        countParams
+        params
     );
 
     const offset = (safePage - 1) * safeLimit;
-    const listParams = [...countParams, safeLimit, offset];
+    const listParams = [...params, safeLimit, offset];
 
     const { rows } = await pool.query(
         `SELECT
             j.*,
             COALESCE(
-                json_agg(jd.depends_on) FILTER (WHERE jd.depends_on IS NOT NULL),
+                json_agg(
+                    json_build_object('id', dep.id, 'name', dep.name)
+                    ORDER BY dep.created_at
+                ) FILTER (WHERE dep.id IS NOT NULL),
                 '[]'
             ) AS dependencies
         FROM jobs j
         LEFT JOIN job_dependencies jd ON jd.job_id = j.id
+        LEFT JOIN jobs dep ON dep.id = jd.depends_on
         ${where}
         GROUP BY j.id
         ORDER BY j.created_at DESC
@@ -103,7 +125,7 @@ export const fetchJobs = async ({ status, page = 1, limit = 20 }) => {
         listParams
     );
 
-    return { rows, page: safePage, limit: safeLimit, total_jobs };
+    return { rows, page: safePage, limit: safeLimit, total_jobs, search: search?.trim() || undefined };
 }
 
 export const fetchJobById = async (id) => {
@@ -111,11 +133,15 @@ export const fetchJobById = async (id) => {
         `SELECT
         j.*,
         COALESCE(
-            json_agg(jd.depends_on) FILTER (WHERE jd.depends_on IS NOT NULL),
+            json_agg(
+                json_build_object('id', dep.id, 'name', dep.name)
+                ORDER BY dep.created_at
+            ) FILTER (WHERE dep.id IS NOT NULL),
             '[]'
         ) AS dependencies
         FROM jobs j
         LEFT JOIN job_dependencies jd ON jd.job_id = j.id
+        LEFT JOIN jobs dep ON dep.id = jd.depends_on
         WHERE j.id = $1
         GROUP BY j.id`,
     [id]

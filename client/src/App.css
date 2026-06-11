@@ -208,6 +208,41 @@ body {
   color: var(--text-faint);
 }
 
+.jobs-toolbar {
+  margin-bottom: 16px;
+}
+
+.jobs-search {
+  width: 100%;
+  max-width: 360px;
+  padding: 9px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.jobs-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.job-deps {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.table-empty {
+  text-align: center;
+  color: var(--text-faint);
+  padding: 28px 12px;
+}
+
 /* Dashboard stat cards */
 
 .stat-grid {
