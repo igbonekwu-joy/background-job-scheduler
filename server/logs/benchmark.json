@@ -1,0 +1,38 @@
+{
+  "ran_at": "2026-06-11T16:21:09.323Z",
+  "results": [
+    {
+      "n": 1000,
+      "heap_insert_ms": 34.668799999999976,
+      "heap_pop_ms": 21.078900000000033,
+      "heap_insert_us_per": 34.668799999999976,
+      "heap_pop_us_per": 21.078900000000033,
+      "wheel_insert_ms": 2.037300000000016,
+      "wheel_tick_ms": 2.7875999999999976,
+      "wheel_insert_us_per": 2.037300000000016,
+      "wheel_tick_us_per": 0.7743333333333328
+    },
+    {
+      "n": 10000,
+      "heap_insert_ms": 32.621200000000044,
+      "heap_pop_ms": 274.91510000000005,
+      "heap_insert_us_per": 3.262120000000005,
+      "heap_pop_us_per": 27.491510000000005,
+      "wheel_insert_ms": 21.795699999999897,
+      "wheel_tick_ms": 556.7524000000001,
+      "wheel_insert_us_per": 2.17956999999999,
+      "wheel_tick_us_per": 154.65344444444446
+    },
+    {
+      "n": 100000,
+      "heap_insert_ms": 245.48700000000008,
+      "heap_pop_ms": 3650.5261,
+      "heap_insert_us_per": 2.454870000000001,
+      "heap_pop_us_per": 36.505261,
+      "wheel_insert_ms": 112.84979999999996,
+      "wheel_tick_ms": 1.1469999999999345,
+      "wheel_insert_us_per": 1.1284979999999998,
+      "wheel_tick_us_per": 0.3186111111110929
+    }
+  ]
+}
