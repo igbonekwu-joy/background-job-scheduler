@@ -4,6 +4,7 @@ import winston from 'winston';
 
 const pool = new Pool({
     connectionString: env.DATABASE_URL,
+    ssl: (env.NODE_ENV === 'production') ? { rejectUnauthorized: false } : null
 });
 
 pool.on("error", (err) => {
