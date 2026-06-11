@@ -1,14 +1,19 @@
 import pg from 'pg';
 import winston from 'winston';
-import env from '../config/env.js';
-import pool from '../config/database.js';
+import { directPgConfig } from '../config/pgDirect.js';
 
 const CHANNEL = 'job_events';
+
+const notifyPool = new pg.Pool({ ...directPgConfig(), max: 1 });
+
+notifyPool.on('error', (err) => {
+  winston.error('Job event notify pool error', { error: err.message });
+});
 
 /** Publish from any process (worker, API). Delivered to the API SSE listener. */
 export async function publishJobEvent(data) {
   const payload = JSON.stringify(data);
-  await pool.query('SELECT pg_notify($1, $2)', [CHANNEL, payload]);
+  await notifyPool.query('SELECT pg_notify($1, $2)', [CHANNEL, payload]);
 }
 
 let listenerStarted = false;
@@ -18,7 +23,7 @@ export async function startJobEventListener(onEvent) {
   if (listenerStarted) return;
   listenerStarted = true;
 
-  const client = new pg.Client({ connectionString: env.DATABASE_URL });
+  const client = new pg.Client(directPgConfig());
 
   client.on('notification', (msg) => {
     if (msg.channel !== CHANNEL || !msg.payload) return;

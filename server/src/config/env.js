@@ -6,6 +6,8 @@ const env = {
     PORT: process.env.PORT || 5000,
     NODE_ENV: process.env.NODE_ENV,
     DATABASE_URL: process.env.DATABASE_URL,
+    /** Direct (non-pooler) URL for LISTEN/NOTIFY; falls back to DATABASE_URL locally. */
+    DATABASE_URL_DIRECT: process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL,
     DLQ_ALERT_THRESHOLD: process.env.DLQ_ALERT_THRESHOLD || 10,
     STARVATION_THRESHOLD_MINUTES: process.env.STARVATION_THRESHOLD_MINUTES || 5,
     WORKER_POLL_INTERVAL_MS: process.env.WORKER_POLL_INTERVAL_MS || 2000,

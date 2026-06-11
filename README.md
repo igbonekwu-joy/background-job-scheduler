@@ -67,6 +67,8 @@ Edit `.env` with your PostgreSQL credentials:
 
 ```env
 DATABASE_URL=
+# Neon: use the pooler URL here; use the direct URL (no -pooler) below for LISTEN/NOTIFY
+DATABASE_URL_DIRECT=
 
 PORT=5000
 NODE_ENV=development
@@ -205,6 +207,8 @@ Query params: `?status=pending&limit=100&offset=0`
 ```
 GET /api/events
 ```
+
+Job status changes are bridged across processes via PostgreSQL `LISTEN`/`NOTIFY`. On Neon, set `DATABASE_URL` to the **pooler** URL and `DATABASE_URL_DIRECT` to the **direct** URL (no `-pooler` in the host).
 
 Opens a persistent Server-Sent Events stream. The client receives a `job.event` frame every time a job changes status. Connect once on page load — no polling needed.
 
