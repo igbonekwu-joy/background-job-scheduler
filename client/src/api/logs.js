@@ -7,6 +7,7 @@ export function mapLogFromApi(log) {
   return {
     id: log.id,
     job_id: log.job_id,
+    name: log.job_name || '',
     event: log.event,
     level: log.level,
     message: log.message,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchJobLogs, DEFAULT_LOGS_PAGE_SIZE } from '../api/logs';
 import { seedLogs, fmtTime } from '../data/seed';
 
@@ -139,6 +139,16 @@ export default function LogsPage({ jobs, live, refreshToken, sourceHint = '' }) 
     }
   }
 
+  const nameById = useMemo(() => {
+    const map = new Map();
+    for (const job of jobs) map.set(job.id, job.name || job.id);
+    return map;
+  }, [jobs]);
+
+  const jobLabel = useCallback((log) => {
+    return log.name || nameById.get(log.job_id) || log.job_id;
+  }, [nameById]);
+
   const filtered = useMemo(
     () => (live ? logs : filterLogs(logs, { jobId, event, level })),
     [logs, live, jobId, event, level]
@@ -164,7 +174,7 @@ export default function LogsPage({ jobs, live, refreshToken, sourceHint = '' }) 
           <select value={jobId} onChange={e => setJobId(e.target.value)}>
             <option value="all">All jobs</option>
             {jobs.map(j => (
-              <option key={j.id} value={j.id}>{j.id.slice(0, 8)}… — {j.type}</option>
+              <option key={j.id} value={j.id}>{j.name || j.id} — {j.type}</option>
             ))}
           </select>
         </label>
@@ -213,8 +223,8 @@ export default function LogsPage({ jobs, live, refreshToken, sourceHint = '' }) 
               {filtered.map(log => (
                 <tr key={log.id} className={`log-row log-row-${log.level}`}>
                   <td className="mono log-time">{fmtTime(log.created_at)}</td>
-                  <td className="mono log-job" title={log.job_id}>
-                    {String(log.job_id).slice(0, 8)}…
+                  <td className="log-job" title={log.job_id}>
+                    {jobLabel(log)}
                   </td>
                   <td><span className="log-event">{log.event}</span></td>
                   <td>

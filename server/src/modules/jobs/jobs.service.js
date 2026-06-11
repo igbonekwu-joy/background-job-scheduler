@@ -159,15 +159,15 @@ function buildLogsWhere({ job_id, event, level }) {
 
     if (job_id) {
         params.push(job_id);
-        conditions.push(`job_id = $${params.length}`);
+        conditions.push(`jl.job_id = $${params.length}`);
     }
     if (event) {
         params.push(event);
-        conditions.push(`event = $${params.length}`);
+        conditions.push(`jl.event = $${params.length}`);
     }
     if (level) {
         params.push(level);
-        conditions.push(`level = $${params.length}`);
+        conditions.push(`jl.level = $${params.length}`);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -186,7 +186,7 @@ export const fetchAllJobLogs = async ({
     const { where, params } = buildLogsWhere({ job_id, event, level });
 
     const { rows: [{ total_logs }] } = await pool.query(
-        `SELECT COUNT(*)::int AS total_logs FROM job_logs ${where}`,
+        `SELECT COUNT(*)::int AS total_logs FROM job_logs jl ${where}`,
         params
     );
 
@@ -194,9 +194,11 @@ export const fetchAllJobLogs = async ({
     const listParams = [...params, safeLimit, offset];
 
     const { rows } = await pool.query(
-        `SELECT * FROM job_logs
+        `SELECT jl.*, j.name AS job_name
+            FROM job_logs jl
+            LEFT JOIN jobs j ON j.id = jl.job_id
             ${where}
-            ORDER BY created_at DESC
+            ORDER BY jl.created_at DESC
             LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
         listParams
     );
