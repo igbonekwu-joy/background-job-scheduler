@@ -196,7 +196,7 @@ export function createWorker(deps = {}) {
         return;
       }
 
-      // max_retries = number of retries allowed (default 3 → 4 total runs, 3 backoff delays)
+      // max_retries = max failures before DLQ (default 3 → 3 total attempts, 2 retries)
       if (newCount >= job.max_retries) {
         await client.query(
           `INSERT INTO dead_letter_queue (job_id, job_snapshot, failure_reason)
