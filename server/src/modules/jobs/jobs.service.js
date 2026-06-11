@@ -3,6 +3,7 @@ import pool from "../../config/database.js";
 import { StatusCodes } from "http-status-codes";
 import { publishJobEvent } from "../../utils/jobEvents.js";
 import { findDependencyCycle } from "./dependencyCycle.js";
+import { buildPageLinks } from "../../utils/pagination.js";
 
 export const saveJob = async (jobData) => {
     const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = jobData;
@@ -70,16 +71,27 @@ export const saveJob = async (jobData) => {
     }
 }
 
-export const fetchJobs = async ({ status, limit, offset }) => {
-    const params = [];
+export const fetchJobs = async ({ status, page = 1, limit = 20, linkBase = '/api/jobs' }) => {
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const safePage = Math.max(1, page);
+
+    const countParams = [];
     let where = '';
 
     if (status) {
-        params.push(status);
-        where = `WHERE j.status = $${params.length}`;
+        countParams.push(status);
+        where = `WHERE j.status = $${countParams.length}`;
     }
 
-    params.push(limit, offset);
+    const { rows: [{ total_jobs }] } = await pool.query(
+        `SELECT COUNT(*)::int AS total_jobs FROM jobs j ${where}`,
+        countParams
+    );
+
+    const total = total_jobs === 0 ? 0 : Math.ceil(total_jobs / safeLimit);
+    const offset = (safePage - 1) * safeLimit;
+
+    const listParams = [...countParams, safeLimit, offset];
 
     const { rows } = await pool.query(
         `SELECT
@@ -93,10 +105,22 @@ export const fetchJobs = async ({ status, limit, offset }) => {
         ${where}
         GROUP BY j.id
         ORDER BY j.created_at DESC
-        LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
+        LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+        listParams
     );
-    return { statusCode: StatusCodes.OK, data: { status: 'success', count: rows.length, jobs: rows } };
+
+    return {
+        statusCode: StatusCodes.OK,
+        data: {
+            status: 'success',
+            page: safePage,
+            limit: safeLimit,
+            total,
+            total_jobs,
+            links: buildPageLinks(linkBase, { page: safePage, limit: safeLimit, status, total }),
+            data: rows,
+        },
+    };
 }
 
 export const fetchJobById = async (id) => {

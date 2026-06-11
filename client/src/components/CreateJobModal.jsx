@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchJobs } from '../api/jobs';
 
-export default function CreateJobModal({ jobs = [], onClose, onCreate }) {
+export default function CreateJobModal({ jobs = [], live = false, onClose, onCreate }) {
+  const [dependencyJobs, setDependencyJobs] = useState(jobs);
   const [form, setForm] = useState({
     type: 'send_email',
     priority: 2,
@@ -10,6 +12,24 @@ export default function CreateJobModal({ jobs = [], onClose, onCreate }) {
     dependencies: [],
   });
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!live) {
+      setDependencyJobs(jobs);
+      return;
+    }
+
+    let cancelled = false;
+    fetchJobs({ page: 1, limit: 100 })
+      .then(result => {
+        if (!cancelled) setDependencyJobs(result.jobs);
+      })
+      .catch(() => {
+        if (!cancelled) setDependencyJobs(jobs);
+      });
+
+    return () => { cancelled = true; };
+  }, [live, jobs]);
 
   function update(field, value) {
     setForm(f => ({ ...f, [field]: value }));
@@ -125,11 +145,11 @@ export default function CreateJobModal({ jobs = [], onClose, onCreate }) {
           <div className="field field-wide">
             <span className="field-label">Dependencies (optional)</span>
             <p className="field-hint">This job will not run until every selected job has completed.</p>
-            {jobs.length === 0 ? (
+            {dependencyJobs.length === 0 ? (
               <p className="field-hint">No jobs available yet.</p>
             ) : (
               <div className="dependency-list" role="group" aria-label="Job dependencies">
-                {jobs.map(j => (
+                {dependencyJobs.map(j => (
                   <label key={j.id} className="dependency-option">
                     <input
                       type="checkbox"

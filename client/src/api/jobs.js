@@ -60,16 +60,33 @@ export function mapStatsFromApi(apiStats) {
   return { counts, totalJobs };
 }
 
-export async function fetchJobs() {
-  const res = await fetch(apiUrl('/api/jobs'));
+const DEFAULT_JOBS_PAGE_SIZE = 20;
+
+export async function fetchJobs({ page = 1, limit = DEFAULT_JOBS_PAGE_SIZE, status } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (status) params.set('status', status);
+
+  const res = await fetch(apiUrl(`/api/jobs?${params}`));
   const body = await parseJsonResponse(res);
 
-  if (body.status !== 'success' || !Array.isArray(body.jobs)) {
+  if (body.status !== 'success' || !Array.isArray(body.data)) {
     throw new Error('Unexpected jobs response');
   }
 
-  return body.jobs.map(mapJobFromApi);
+  return {
+    page: body.page,
+    limit: body.limit,
+    total: body.total,
+    total_jobs: body.total_jobs,
+    links: body.links ?? {},
+    jobs: body.data.map(mapJobFromApi),
+  };
 }
+
+export { DEFAULT_JOBS_PAGE_SIZE };
 
 export async function fetchJobStats() {
   const res = await fetch(apiUrl('/api/jobs/stats'));

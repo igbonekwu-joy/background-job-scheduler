@@ -1,11 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
 import DLQPage from './pages/DLQPage';
 import LogsPage from './pages/LogsPage';
-import { fetchJobs, createJob, cancelJob, mapJobFromApi, mapStatsFromApi, fetchJobStats } from './api/jobs';
+import {
+  fetchJobs,
+  createJob,
+  cancelJob,
+  mapJobFromApi,
+  mapStatsFromApi,
+  fetchJobStats,
+  DEFAULT_JOBS_PAGE_SIZE,
+} from './api/jobs';
 import { fetchDlqEntries, retryDlqEntry } from './api/dlq';
 import { seedJobs, seedDLQ } from './data/seed';
 import { useJobEvents } from './hooks/useJobEvents';
@@ -19,14 +27,35 @@ export default function App() {
 
   const [liveStats, setLiveStats] = useState(null);
   const [logsRefresh, setLogsRefresh] = useState(0);
+  const [jobsPagination, setJobsPagination] = useState({
+    page: 1,
+    limit: DEFAULT_JOBS_PAGE_SIZE,
+    total: 0,
+    total_jobs: 0,
+    links: {},
+  });
+  const jobsPageRef = useRef(1);
+
+  const loadJobsPage = useCallback(async (page = 1) => {
+    const result = await fetchJobs({ page, limit: DEFAULT_JOBS_PAGE_SIZE });
+    jobsPageRef.current = result.page;
+    setJobs(result.jobs);
+    setJobsPagination({
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      total_jobs: result.total_jobs,
+      links: result.links,
+    });
+    return result;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([fetchJobs(), fetchDlqEntries(), fetchJobStats()])
-      .then(([liveJobs, liveDlq, stats]) => {
+    Promise.all([loadJobsPage(1), fetchDlqEntries(), fetchJobStats()])
+      .then(([, liveDlq, stats]) => {
         if (!cancelled) {
-          setJobs(liveJobs);
           setDlq(liveDlq);
           setLiveStats(stats);
           setDataSource('live');
@@ -37,7 +66,7 @@ export default function App() {
       });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [loadJobsPage]);
 
   useJobEvents((event) => {
     if (event._type === 'stats') {
@@ -46,11 +75,11 @@ export default function App() {
     }
 
     if (event._type === 'connected') {
-      fetchJobs().then(setJobs).catch(() => {});
+      loadJobsPage(jobsPageRef.current).catch(() => {});
       return;
     }
 
-    fetchJobs().then(setJobs).catch(() => {});
+    loadJobsPage(jobsPageRef.current).catch(() => {});
     setLogsRefresh(n => n + 1);
 
     if (event.status === 'failed') {
@@ -72,7 +101,7 @@ export default function App() {
 
     try {
       const job = await createJob(jobInput);
-      setJobs(prev => [job, ...prev]);
+      await loadJobsPage(1);
       showToast(`Queued ${job.id}`);
       return true;
     } catch (err) {
@@ -150,7 +179,15 @@ export default function App() {
           />
         )}
         {view === 'jobs' && (
-          <JobsPage jobs={jobs} onCreate={handleCreate} onCancel={handleCancel} sourceHint={sourceHint} />
+          <JobsPage
+            jobs={jobs}
+            pagination={jobsPagination}
+            live={dataSource === 'live'}
+            onPageChange={loadJobsPage}
+            onCreate={handleCreate}
+            onCancel={handleCancel}
+            sourceHint={sourceHint}
+          />
         )}
         {view === 'logs' && (
           <LogsPage

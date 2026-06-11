@@ -410,6 +410,24 @@ tbody tr:hover {
   border-color: rgba(255, 255, 255, 0.18);
 }
 
+.btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.pagination-status {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
 /* Modal */
 
 .modal-backdrop {

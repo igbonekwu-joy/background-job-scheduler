@@ -186,9 +186,27 @@ All responses follow the shape `{ success: boolean, data: ... }`.
 
 #### GET /api/jobs
 
-Query params: `?status=pending&limit=100&offset=0`
+Query params: `?status=pending&page=1&limit=20`
 
 `status` accepts: `pending`, `processing`, `completed`, `failed`, `cancelled`
+
+Response:
+
+```json
+{
+  "status": "success",
+  "page": 1,
+  "limit": 20,
+  "total": 5,
+  "total_jobs": 87,
+  "links": {
+    "self": "https://host/api/jobs?page=1&limit=20",
+    "next": "https://host/api/jobs?page=2&limit=20",
+    "prev": null
+  },
+  "data": []
+}
+```
 
 ### Dead-Letter Queue
 

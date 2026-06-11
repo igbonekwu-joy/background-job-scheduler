@@ -16,11 +16,16 @@ export const createJob = async (req, res) => {
 }
 
 export const getJobs = async (req, res) => {
-    const { status, limit, offset } = req.query;
+    const { status, page, limit } = req.query;
+    const parsedLimit = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 20;
+    const parsedPage = page ? Math.max(1, parseInt(page, 10)) : 1;
+    const linkBase = `${req.protocol}://${req.get('host')}${req.baseUrl}`;
+
     const jobs = await fetchJobs({
         status,
-        limit:  limit  ? parseInt(limit)  : 100,
-        offset: offset ? parseInt(offset) : 0,
+        page: parsedPage,
+        limit: parsedLimit,
+        linkBase,
     });
 
     res.status(jobs.statusCode).json(jobs.data);

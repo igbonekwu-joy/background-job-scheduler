@@ -21,15 +21,15 @@
  *         schema:
  *           $ref: '#/components/schemas/api/jobstatus'
  *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 100
- *       - in: query
- *         name: offset
- *         schema:
- *           type: integer
- *           default: 0
+ *           default: 20
  *     responses:
  *       200:
  *         description: Paginated list of jobs

@@ -5,15 +5,41 @@ import { PRIORITY_LABEL, fmtTime } from '../data/seed';
 
 const CANCELLABLE = new Set(['pending', 'processing']);
 
-export default function JobsPage({ jobs, onCreate, onCancel, sourceHint = '' }) {
+const EMPTY_PAGINATION = { page: 1, limit: 20, total: 0, total_jobs: 0, links: {} };
+
+export default function JobsPage({
+  jobs,
+  pagination = EMPTY_PAGINATION,
+  live = false,
+  onPageChange,
+  onCreate,
+  onCancel,
+  sourceHint = '',
+}) {
   const [showModal, setShowModal] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
+
+  const { page, total, total_jobs, links } = pagination;
+  const recordLabel = live
+    ? `${total_jobs} total · page ${page} of ${Math.max(total, 1)}`
+    : `${jobs.length} records`;
+
+  async function goToPage(nextPage) {
+    if (!live || !onPageChange || nextPage < 1 || nextPage > total) return;
+    setPageLoading(true);
+    try {
+      await onPageChange(nextPage);
+    } finally {
+      setPageLoading(false);
+    }
+  }
 
   return (
     <div className="page">
       <div className="page-head">
         <h1>Jobs</h1>
         <div className="page-head-actions">
-          <span className="page-sub mono">{jobs.length} records{sourceHint}</span>
+          <span className="page-sub mono">{recordLabel}{sourceHint}</span>
           <button className="btn-primary" onClick={() => setShowModal(true)}>
             + Create job
           </button>
@@ -61,8 +87,33 @@ export default function JobsPage({ jobs, onCreate, onCancel, sourceHint = '' }) 
         </table>
       </div>
 
+      {live && total > 1 && (
+        <nav className="pagination" aria-label="Jobs pagination">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={!links.prev || pageLoading}
+            onClick={() => goToPage(page - 1)}
+          >
+            Previous
+          </button>
+          <span className="pagination-status mono">
+            Page {page} of {total}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={!links.next || pageLoading}
+            onClick={() => goToPage(page + 1)}
+          >
+            Next
+          </button>
+        </nav>
+      )}
+
       {showModal && (
         <CreateJobModal
+          live={live}
           jobs={jobs}
           onClose={() => setShowModal(false)}
           onCreate={onCreate}
