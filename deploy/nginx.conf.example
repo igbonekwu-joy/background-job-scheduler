@@ -3,7 +3,7 @@
 
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name 51.21.200.61;
 
     root /var/www/queuectl/client/dist;
     index index.html;
