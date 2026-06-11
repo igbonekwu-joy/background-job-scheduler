@@ -1,7 +1,7 @@
 import winston from 'winston';
 import { sendEmail } from '../handlers/emailHandler.js';
 import { logEvent } from '../jobs/jobs.service.js';
-import { checkDlqThreshold, resolveDlqForJob } from '../dlq/dlq.service.js';
+import { checkDlqThreshold, resolveDlqForJob, upsertDlqEntry } from '../dlq/dlq.service.js';
 import pool from '../../config/database.js';
 import { publishJobEvent } from '../../utils/jobEvents.js';
 
@@ -223,14 +223,12 @@ export function createWorker(deps = {}) {
       }
 
       // max_retries = max automatic retries (default 3); DLQ when newCount > max_retries
-      console.log(newCount, job.max_retries);
       if (newCount > job.max_retries) {
-        console.log('max retries reached', newCount, job.max_retries);
-        await client.query(
-          `INSERT INTO dead_letter_queue (job_id, job_snapshot, failure_reason)
-           VALUES ($1, $2, $3)`,
-          [job.id, job, err.message]
-        );
+        const { inserted } = await upsertDlqEntry(client, {
+          jobId: job.id,
+          jobSnapshot: job,
+          failureReason: err.message,
+        });
 
         await client.query(
           `UPDATE jobs
@@ -243,14 +241,20 @@ export function createWorker(deps = {}) {
           jobId:    job.id,
           event:    'job.failed',
           level:    'error',
-          message:  `Exhausted ${job.max_retries} retries. Sent to DLQ.`,
-          metadata: { error: err.message, retry_count: newCount },
+          message:  inserted
+            ? `Exhausted ${job.max_retries} retries. Sent to DLQ.`
+            : `Exhausted ${job.max_retries} retries. Updated existing DLQ entry.`,
+          metadata: { error: err.message, retry_count: newCount, dlq_updated: !inserted },
         });
 
         await client.query('COMMIT');
         publish({ status: 'failed', job_id: job.id, type: job.type }).catch(() => {});
-        winston.warn('Job sent to DLQ', { job_id: job.id, type: job.type });
-        await checkThreshold();
+        if (inserted) {
+          winston.warn('Job sent to DLQ', { job_id: job.id, type: job.type });
+          await checkThreshold();
+        } else {
+          winston.info('DLQ entry updated', { job_id: job.id, type: job.type });
+        }
       } else {
         const delay   = backoff(newCount);
         const retryAt = new Date(Date.now() + delay).toISOString();

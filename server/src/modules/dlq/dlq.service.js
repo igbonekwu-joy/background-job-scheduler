@@ -118,6 +118,30 @@ export const retryFromDlq = async (dlqId, { retriedBy = 'engineer', payload } = 
   }
 }
 
+/** Update an existing unresolved DLQ row, or insert one if the job is not already queued. */
+export const upsertDlqEntry = async (client, { jobId, jobSnapshot, failureReason }) => {
+  const { rowCount } = await client.query(
+    `UPDATE dead_letter_queue
+     SET job_snapshot = $2,
+         failure_reason = $3,
+         failed_at = NOW()
+     WHERE job_id = $1 AND resolved = FALSE`,
+    [jobId, jobSnapshot, failureReason]
+  );
+
+  if (rowCount > 0) {
+    return { inserted: false };
+  }
+
+  await client.query(
+    `INSERT INTO dead_letter_queue (job_id, job_snapshot, failure_reason)
+     VALUES ($1, $2, $3)`,
+    [jobId, jobSnapshot, failureReason]
+  );
+
+  return { inserted: true };
+};
+
 /** Mark the latest manually-retried DLQ entry resolved after its job completes. */
 export const resolveDlqForJob = async (client, jobId) => {
   await client.query(

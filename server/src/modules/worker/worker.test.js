@@ -288,7 +288,7 @@ describe('recordFailure', () => {
   });
 
   it('sends job to DLQ when failure count exceeds max_retries', async () => {
-    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, { rowCount: 0 }, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
@@ -306,13 +306,37 @@ describe('recordFailure', () => {
     await recordFailure(job, err);
 
     assert.equal(findQuery(client, /status\s*=\s*'pending'/), undefined);
+    assert.match(findQuery(client, /UPDATE dead_letter_queue/).sql, /job_snapshot/);
     assert.match(findQuery(client, /INSERT INTO dead_letter_queue/).sql, /dead_letter_queue/);
     assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.failed');
     assert.equal(checkDlqThreshold.mock.calls.length, 1);
   });
 
+  it('updates existing DLQ entry instead of inserting a duplicate', async () => {
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, { rowCount: 1 }, {}, {}]);
+    const logEvent = mock.fn(async () => {});
+    const publishJobEvent = mock.fn(async () => {});
+    const checkDlqThreshold = mock.fn(async () => {});
+    const job = { ...baseJob, max_retries: 2, retry_count: 2 };
+    const err = new Error('still failing');
+
+    const { recordFailure } = createWorker({
+      pool: createMockPool(client),
+      logEvent,
+      publishJobEvent,
+      checkDlqThreshold,
+    });
+
+    await recordFailure(job, err);
+
+    assert.match(findQuery(client, /UPDATE dead_letter_queue/).sql, /job_snapshot/);
+    assert.equal(findQuery(client, /INSERT INTO dead_letter_queue/), undefined);
+    assert.equal(logEvent.mock.calls[0].arguments[1].metadata.dlq_updated, true);
+    assert.equal(checkDlqThreshold.mock.calls.length, 0);
+  });
+
   it('sends job to DLQ when max retries are exhausted', async () => {
-    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
+    const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, { rowCount: 0 }, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
