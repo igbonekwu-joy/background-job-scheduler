@@ -79,18 +79,28 @@ describe('claimJob', () => {
   });
 
   it('returns null when dependencies are unmet', async () => {
-    const client = createMockClient([
+    const claimClient = createMockClient([
       {},
       { rows: [{ ...baseJob, id: 'job-1' }] },
       { rows: [{ id: 'dep-1', status: 'pending' }] },
       {},
     ]);
-    const { claimJob } = createWorker({ pool: createMockPool(client) });
+    const logClient = createMockClient([{}, {}]);
+    const logEvent = mock.fn(async () => {});
+    const { claimJob } = createWorker({
+      pool: createMockPool(claimClient, logClient),
+      logEvent,
+    });
 
     const result = await claimJob('job-1');
 
     assert.equal(result, null);
-    assert.equal(client.queries[3].sql, 'ROLLBACK');
+    assert.equal(claimClient.queries[3].sql, 'ROLLBACK');
+    assert.equal(logEvent.mock.calls.length, 1);
+    assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.held');
+    assert.deepEqual(logEvent.mock.calls[0].arguments[1].metadata.waiting_on, ['dep-1']);
+    assert.equal(logClient.queries[0].sql, 'BEGIN');
+    assert.equal(logClient.queries[1].sql, 'COMMIT');
   });
 
   it('claims job and marks it processing when ready', async () => {

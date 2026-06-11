@@ -42,6 +42,20 @@ export function createWorker(deps = {}) {
     winston.info('Recurring job re-scheduled', { original: job.id, next_run: next });
   }
 
+  async function persistLog(entry) {
+    const logClient = await db.connect();
+    try {
+      await logClient.query('BEGIN');
+      await log(logClient, entry);
+      await logClient.query('COMMIT');
+    } catch (err) {
+      await logClient.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      logClient.release();
+    }
+  }
+
   async function claimJob(jobId) {
     const client = await db.connect();
     try {
@@ -74,9 +88,21 @@ export function createWorker(deps = {}) {
       const unmet = deps.filter(d => d.status !== 'completed');
       if (unmet.length) {
         await client.query('ROLLBACK');
+
+        const waitingOn = unmet.map(d => d.id);
+        await persistLog({
+          jobId:    locked.id,
+          event:    'job.held',
+          level:    'info',
+          message:  `Job held: ${unmet.length} dependenc${unmet.length === 1 ? 'y' : 'ies'} unmet`,
+          metadata: { waiting_on: waitingOn },
+        }).catch((err) => {
+          winston.warn('Failed to log dependency hold', { job_id: locked.id, error: err.message });
+        });
+
         winston.info('Job held: dependencies unmet', {
           job_id: locked.id,
-          waiting_on: unmet.map(d => d.id),
+          waiting_on: waitingOn,
         });
         return null;
       }

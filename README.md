@@ -455,7 +455,7 @@ The timing wheel wins on raw insert speed at every size because inserting is a s
 
 All logs are structured JSON via Winston. Every significant event writes a row to both the `job_logs` table and the Winston transports (console + `logfile.log`).
 
-Logged events: `job.created`, `job.started`, `job.retry`, `job.failed`, `job.cancelled`, `job.completed`
+Logged events: `job.created`, `job.held`, `job.started`, `job.retry`, `job.failed`, `job.cancelled`, `job.completed`
 
 ---
 
