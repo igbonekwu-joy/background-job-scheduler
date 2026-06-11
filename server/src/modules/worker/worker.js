@@ -196,8 +196,8 @@ export function createWorker(deps = {}) {
         return;
       }
 
-      // max_retries = number of retries allowed (default 3 → 4 total runs, 3 backoff delays)
-      if (newCount > job.max_retries) {
+      // max_retries = max total attempts (default 3 → 3 runs, 2 backoff delays)
+      if (newCount >= job.max_retries) {
         await client.query(
           `INSERT INTO dead_letter_queue (job_id, job_snapshot, failure_reason)
            VALUES ($1, $2, $3)`,
@@ -215,7 +215,7 @@ export function createWorker(deps = {}) {
           jobId:    job.id,
           event:    'job.failed',
           level:    'error',
-          message:  `Exhausted ${job.max_retries} retries. Sent to DLQ.`,
+          message:  `Exhausted ${job.max_retries} attempts. Sent to DLQ.`,
           metadata: { error: err.message, retry_count: newCount },
         });
 

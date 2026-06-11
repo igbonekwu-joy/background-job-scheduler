@@ -256,13 +256,13 @@ describe('recordFailure', () => {
     assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
   });
 
-  it('sends job to DLQ when failure count exceeds max_retries', async () => {
+  it('sends job to DLQ when failure count reaches max_retries', async () => {
     const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
-    // max_retries=3 allows 3 retries; DLQ on the 4th failure (retry_count 3 → newCount 4)
-    const job = { ...baseJob, max_retries: 3, retry_count: 3 };
+    // max_retries=3 → 3 total runs; DLQ on the 3rd failure (retry_count 2 → newCount 3)
+    const job = { ...baseJob, max_retries: 3, retry_count: 2 };
     const err = new Error('still failing');
 
     const { recordFailure } = createWorker({
@@ -285,7 +285,7 @@ describe('recordFailure', () => {
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
-    const job = { ...baseJob, max_retries: 2, retry_count: 2 };
+    const job = { ...baseJob, max_retries: 2, retry_count: 1 };
     const err = new Error('permanent failure');
 
     const { recordFailure } = createWorker({
@@ -297,6 +297,7 @@ describe('recordFailure', () => {
 
     await recordFailure(job, err);
 
+    assert.equal(findQuery(client, /status\s*=\s*'pending'/), undefined);
     assert.match(findQuery(client, /INSERT INTO dead_letter_queue/).sql, /dead_letter_queue/);
     assert.deepEqual(findQuery(client, /INSERT INTO dead_letter_queue/).params, [job.id, job, 'permanent failure']);
     assert.match(findQuery(client, /status = 'failed'/).sql, /failed/);

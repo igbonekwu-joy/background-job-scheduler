@@ -181,7 +181,7 @@ All responses follow the shape `{ success: boolean, data: ... }`.
 | `payload` | object | | Passed as-is to the handler |
 | `scheduled_at` | ISO string | | Job will not run before this time |
 | `recurring_interval` | string | | `every_1_minute`, `every_5_minutes`, `every_1_hour` |
-| `max_retries` | integer | | Max **retries** after the first failure (default `3` → 4 total runs) |
+| `max_retries` | integer | | Max **total attempts** before DLQ (default `3` → 3 runs) |
 | `dependencies` | UUID[] | | Job will not run until all listed jobs are `completed` |
 
 #### GET /api/jobs
@@ -273,7 +273,7 @@ The handler may have already performed its side-effect (e.g. simulated email del
 
 ## Retry behaviour
 
-`max_retries` is the number of **automatic retries** after the first failure (default `3`). A job may therefore run up to **4 times** (1 initial attempt + 3 retries) before it is sent to the DLQ.
+`max_retries` is the maximum number of **total attempts** before a job is sent to the DLQ (default `3` → up to 3 runs).
 
 On each failure, `retry_count` increments and the next run is scheduled with exponential backoff and jitter:
 
@@ -283,7 +283,7 @@ On each failure, `retry_count` increments and the next run is scheduled with exp
 | 2nd | ~5 s |
 | 3rd | ~25 s |
 
-After the 4th failure (when `retry_count` exceeds `max_retries`), the job is marked `failed` and a record is inserted into the dead-letter queue. The original job row remains in the `jobs` table for audit purposes.
+After the final allowed failure (when the failure count reaches `max_retries`), the job is marked `failed` and a record is inserted into the dead-letter queue. The original job row remains in the `jobs` table for audit purposes.
 
 ---
 
