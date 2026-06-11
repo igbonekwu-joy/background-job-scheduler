@@ -137,7 +137,7 @@ export default function App() {
   async function handleCreate(jobInput) {
     if (dataSource !== 'live') {
       setJobs(prev => [jobInput, ...prev]);
-      showToast(`Queued ${jobInput.id}`);
+      showToast(`Queued ${jobInput.name || jobInput.id}`);
       return true;
     }
 
@@ -178,6 +178,7 @@ export default function App() {
       setJobs(prev => [
         {
           id: entry.job_id ?? entry.id,
+          name: entry.name ?? '',
           type: entry.type,
           priority: entry.priority,
           status: 'pending',

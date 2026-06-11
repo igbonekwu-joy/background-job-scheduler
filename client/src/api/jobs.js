@@ -29,6 +29,7 @@ function formatInterval(recurringInterval) {
 export function mapJobFromApi(job) {
   return {
     id: job.id,
+    name: job.name ?? '',
     type: job.type,
     priority: job.priority,
     status: mapStatusFromApi(job.status),
@@ -106,6 +107,7 @@ export async function createJob(jobInput) {
     : undefined;
 
   const body = {
+    name: jobInput.name?.trim(),
     type: jobInput.type,
     priority: Number(jobInput.priority),
     scheduled_at: new Date(jobInput.scheduled_time).toISOString(),

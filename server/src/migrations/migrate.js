@@ -11,6 +11,7 @@ const MIGRATION_NAMES = [
     'dead_letter_queue',
     'job_logs',
     'indexes',
+    'job_name',
 ];
 
 const migrations = MIGRATION_NAMES.map((name, index) => ({

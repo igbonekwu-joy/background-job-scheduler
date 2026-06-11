@@ -4,9 +4,9 @@ import { validateCreateJob } from "./jobs.validator.js";
 import { linkBaseFromReq, parsePagination, toPaginatedBody } from "../../utils/apiResponse.js";
 
 export const createJob = async (req, res) => {
-    const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = req.body;
+    const { name, type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = req.body;
 
-    const validated = validateCreateJob({ type, payload, priority, scheduled_at, recurring_interval, max_retries, dependencies });
+    const validated = validateCreateJob({ name, type, payload, priority, scheduled_at, recurring_interval, max_retries, dependencies });
     if (validated.error) {
         return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ status: 'error', error: validated.error });
     }

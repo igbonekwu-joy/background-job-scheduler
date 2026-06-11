@@ -4,6 +4,7 @@ import { fetchJobs } from '../api/jobs';
 export default function CreateJobModal({ jobs = [], live = false, onClose, onCreate }) {
   const [fetchedJobs, setFetchedJobs] = useState(null);
   const [form, setForm] = useState({
+    name: '',
     type: 'send_email',
     priority: 2,
     scheduled_time: '',
@@ -47,6 +48,10 @@ export default function CreateJobModal({ jobs = [], live = false, onClose, onCre
     e.preventDefault();
     setError('');
 
+    if (!form.name.trim()) {
+      setError('Job name is required.');
+      return;
+    }
     if (!form.type.trim()) {
       setError('Job type is required.');
       return;
@@ -67,6 +72,7 @@ export default function CreateJobModal({ jobs = [], live = false, onClose, onCre
 
     const job = {
       id: `job_${Math.random().toString(16).slice(2, 6)}`,
+      name: form.name.trim(),
       type: form.type.trim(),
       priority: Number(form.priority),
       status: 'pending',
@@ -100,13 +106,24 @@ export default function CreateJobModal({ jobs = [], live = false, onClose, onCre
         </div>
 
         <form className="job-form" onSubmit={handleSubmit}>
+          <div className="field field-wide">
+            <label htmlFor="name">Job name</label>
+            <input
+              id="name"
+              type="text"
+              placeholder="Weekly digest email"
+              value={form.name}
+              onChange={e => update('name', e.target.value)}
+              autoFocus
+            />
+          </div>
+
           <div className="field">
             <label htmlFor="type">Job type</label>
             <select
               id="type"
               value={form.type}
               onChange={e => update('type', e.target.value)}
-              autoFocus
             >
               <option value="send_email">Send Email</option>
             </select>
@@ -155,7 +172,7 @@ export default function CreateJobModal({ jobs = [], live = false, onClose, onCre
                       checked={form.dependencies.includes(j.id)}
                       onChange={() => toggleDependency(j.id)}
                     />
-                    <span className="mono">{j.id}</span>
+                    <span>{j.name || j.id}</span>
                     <span>{j.type}</span>
                     <span className="dependency-status">{j.status}</span>
                   </label>

@@ -5,7 +5,7 @@ import { findDependencyCycle } from "./dependencyCycle.js";
 import { NotFoundError, BadRequestError, UnprocessableError } from "../../utils/errors.js";
 
 export const saveJob = async (jobData) => {
-    const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = jobData;
+    const { name, type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = jobData;
     const runAt = scheduled_at || null;
 
     const client = await pool.connect();
@@ -25,11 +25,11 @@ export const saveJob = async (jobData) => {
 
         const { rows: [job] } = await client.query(
             `INSERT INTO jobs
-                (type, payload, priority, effective_priority, scheduled_at, run_at,
+                (name, type, payload, priority, effective_priority, scheduled_at, run_at,
                 recurring_interval, max_retries)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *`,
-            [type, payload, priority, priority, scheduled_at, runAt, recurring_interval, max_retries]
+            [name, type, payload, priority, priority, scheduled_at, runAt, recurring_interval, max_retries]
         );
 
         if (dependencies.length > 0) {
@@ -51,8 +51,8 @@ export const saveJob = async (jobData) => {
             jobId:   job.id,
             event:   'job.created',
             level:   'info',
-            message: `Job created: type=${type}, priority=${priority}`,
-            metadata: { type, priority, scheduled_at, recurring_interval, dependency_count: dependencies.length }
+            message: `Job created: name=${name}, type=${type}, priority=${priority}`,
+            metadata: { name, type, priority, scheduled_at, recurring_interval, dependency_count: dependencies.length }
         });
 
         await client.query('COMMIT');

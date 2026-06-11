@@ -3,6 +3,11 @@ import Joi from 'joi';
 const VALID_INTERVALS = ['every_1_minute', 'every_5_minutes', 'every_1_hour'];
 
 const createJobSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(200).required().messages({
+    'string.empty': 'name is required',
+    'any.required': 'name is required',
+  }),
+
   type: Joi.string().trim().min(1).max(100).required(),
 
   payload: Joi.object().default({}),

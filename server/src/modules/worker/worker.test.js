@@ -209,9 +209,9 @@ describe('recordSuccess', () => {
     const insert = findQuery(client, /INSERT INTO jobs/);
     assert.ok(insert);
     const insertParams = insert.params;
-    assert.equal(insertParams[0], 'send_email');
-    assert.equal(insertParams[6], 'every_1_minute');
-    assert.equal(insertParams[7], 3);
+    assert.equal(insertParams[1], 'send_email');
+    assert.equal(insertParams[7], 'every_1_minute');
+    assert.equal(insertParams[8], 3);
   });
 });
 

@@ -34,10 +34,10 @@ export function createWorker(deps = {}) {
     const next = new Date(Date.now() + ms).toISOString();
     await client.query(
       `INSERT INTO jobs
-         (type, payload, priority, effective_priority,
+         (name, type, payload, priority, effective_priority,
           scheduled_at, run_at, recurring_interval, max_retries)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [job.type, job.payload, job.priority, job.priority, next, next, job.recurring_interval, job.max_retries]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [job.name, job.type, job.payload, job.priority, job.priority, next, next, job.recurring_interval, job.max_retries]
     );
     winston.info('Recurring job re-scheduled', { original: job.id, next_run: next });
   }

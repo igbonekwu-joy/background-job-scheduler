@@ -50,7 +50,7 @@ export default function JobsPage({
         <table>
           <thead>
             <tr>
-              <th>id</th>
+              <th>name</th>
               <th>type</th>
               <th>priority</th>
               <th>status</th>
@@ -65,7 +65,7 @@ export default function JobsPage({
           <tbody>
             {jobs.map(j => (
               <tr key={j.id}>
-                <td className="mono">{j.id}</td>
+                <td title={j.id}>{j.name || j.id}</td>
                 <td>{j.type}</td>
                 <td><span className={`prio prio-${j.priority}`}>{PRIORITY_LABEL[j.priority]}</span></td>
                 <td><StatusPill status={j.status} /></td>

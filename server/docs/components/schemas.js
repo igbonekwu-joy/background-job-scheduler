@@ -12,8 +12,13 @@
  *
  *     CreateJobRequest:
  *       type: object
- *       required: [type]
+ *       required: [name, type]
  *       properties:
+ *         name:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 200
+ *           example: Weekly digest email
  *         type:
  *           type: string
  *           minLength: 1
