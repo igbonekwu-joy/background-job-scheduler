@@ -1,31 +1,40 @@
+import { StatusCodes } from "http-status-codes";
 import { getDlqEntries, getDlqEntryById, retryFromDlq } from "./dlq.service.js";
+import { linkBaseFromReq, parsePagination, toPaginatedBody } from "../../utils/apiResponse.js";
 
 export const getQueue = async (req, res) => {
-    const { page, limit } = req.query;
     const includeResolved = req.query.include_resolved === 'true';
-    const parsedLimit = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 10;
-    const parsedPage = page ? Math.max(1, parseInt(page, 10)) : 1;
-    const linkBase = `${req.protocol}://${req.get('host')}${req.baseUrl}`;
+    const { page, limit } = parsePagination(req.query, 10);
 
-    const entries = await getDlqEntries({
-        includeResolved,
-        page: parsedPage,
-        limit: parsedLimit,
-        linkBase,
-    });
+    const result = await getDlqEntries({ includeResolved, page, limit });
 
-    res.status(entries.statusCode).json(entries.data);
+    const filters = {};
+    if (includeResolved) filters.include_resolved = 'true';
+
+    res.status(StatusCodes.OK).json(toPaginatedBody({
+        rows: result.rows,
+        page: result.page,
+        limit: result.limit,
+        totalCount: result.total_dlq,
+        countKey: 'total_dlq',
+        linkBase: linkBaseFromReq(req),
+        filters,
+    }));
 }
 
 export const getQueueById = async (req, res) => {
     const entry = await getDlqEntryById(req.params.id);
-
-    res.status(entry.statusCode).json(entry.data);
+    res.status(StatusCodes.OK).json({ success: true, data: entry });
 }
 
 export const retryDlq = async (req, res) => {
     const retriedBy = req.body?.retried_by || 'engineer';
-    const result = await retryFromDlq(req.params.id, retriedBy);
+    const { job, dlqEntry } = await retryFromDlq(req.params.id, retriedBy);
 
-    return res.status(result.statusCode).json(result.data);
+    res.status(StatusCodes.OK).json({
+        status: 'success',
+        message: 'Job retried successfully',
+        job,
+        dlqEntry,
+    });
 }

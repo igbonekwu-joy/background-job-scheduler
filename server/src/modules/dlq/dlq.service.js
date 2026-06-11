@@ -1,10 +1,9 @@
-import { StatusCodes } from "http-status-codes";
 import pool from "../../config/database.js";
 import env from "../../config/env.js";
 import winston from "winston";
 import { logEvent } from "../jobs/jobs.service.js";
 import { sendEmail } from "../handlers/emailHandler.js";
-import { buildPageLinks } from "../../utils/pagination.js";
+import { NotFoundError } from "../../utils/errors.js";
 
 const DLQ_ALERT_THRESHOLD = parseInt(env.DLQ_ALERT_THRESHOLD || '10');
 
@@ -12,7 +11,6 @@ export const getDlqEntries = async ({
     includeResolved = false,
     page = 1,
     limit = 10,
-    linkBase = '/api/dlq',
 }) => {
     const safeLimit = Math.min(100, Math.max(1, limit));
     const safePage = Math.max(1, page);
@@ -22,7 +20,6 @@ export const getDlqEntries = async ({
         `SELECT COUNT(*)::int AS total_dlq FROM dead_letter_queue ${where}`
     );
 
-    const total = total_dlq === 0 ? 0 : Math.ceil(total_dlq / safeLimit);
     const offset = (safePage - 1) * safeLimit;
 
     const { rows } = await pool.query(
@@ -33,26 +30,7 @@ export const getDlqEntries = async ({
         [safeLimit, offset]
     );
 
-    const filters = {};
-    if (includeResolved) filters.include_resolved = 'true';
-
-    return {
-        statusCode: StatusCodes.OK,
-        data: {
-            status: 'success',
-            page: safePage,
-            limit: safeLimit,
-            total,
-            total_dlq,
-            links: buildPageLinks(linkBase, {
-                page: safePage,
-                limit: safeLimit,
-                total,
-                filters,
-            }),
-            data: rows,
-        },
-    };
+    return { rows, page: safePage, limit: safeLimit, total_dlq, includeResolved };
 }
 
 export const getDlqEntryById = async (id) => {
@@ -61,10 +39,10 @@ export const getDlqEntryById = async (id) => {
         [id]
     );
     if (!entry) {
-        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: 'DLQ entry not found' } };
+        throw new NotFoundError('DLQ entry not found');
     }
 
-    return { statusCode: StatusCodes.OK, data: { success: true, data: entry  } };
+    return entry;
 }
 
 export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
@@ -79,7 +57,7 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
     );
     if (!entry) {
         await client.query('ROLLBACK');
-        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: `DLQ entry ${dlqId} not found` } };
+        throw new NotFoundError(`DLQ entry ${dlqId} not found`);
     }
 
     const { rows: [job] } = await client.query(
@@ -97,7 +75,7 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
     );
     if (!job) {
         await client.query('ROLLBACK');
-        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: `Original job ${entry.job_id} not found` } };
+        throw new NotFoundError(`Original job ${entry.job_id} not found`);
     }
 
     await client.query(
@@ -118,11 +96,11 @@ export const retryFromDlq = async (dlqId, retriedBy = 'engineer') => {
     await client.query('COMMIT');
     winston.info('DLQ manual retry triggered', { dlq_id: dlqId, job_id: entry.job_id, retried_by: retriedBy });
 
-    return { statusCode: StatusCodes.OK, data: { status: 'success', message: 'Job retried successfully', job, dlqEntry: entry } };
+    return { job, dlqEntry: entry };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     winston.error('DB error in retryFromDlq', { err });
-    return { statusCode: StatusCodes.INTERNAL_SERVER_ERROR, data: { status: 'error', message: 'DB error in retryFromDlq' } };
+    throw err;
   } finally {
     client.release();
   }

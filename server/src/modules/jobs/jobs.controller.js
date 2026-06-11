@@ -1,77 +1,76 @@
 import { StatusCodes } from "http-status-codes";
 import { fetchJobById, fetchJobs, saveJob, fetchAllJobLogs, fetchJobLogs, cancelJobById, fetchStats } from "./jobs.service.js";
 import { validateCreateJob } from "./jobs.validator.js";
+import { linkBaseFromReq, parsePagination, toPaginatedBody } from "../../utils/apiResponse.js";
 
 export const createJob = async (req, res) => {
     const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = req.body;
 
-    // Validation
     const validated = validateCreateJob({ type, payload, priority, scheduled_at, recurring_interval, max_retries, dependencies });
     if (validated.error) {
         return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ status: 'error', error: validated.error });
     }
 
-    const result = await saveJob(validated);
-    res.status(result.statusCode).json(result.data);
+    const job = await saveJob(validated);
+    res.status(StatusCodes.CREATED).json({
+        status: 'success',
+        message: 'Job created successfully',
+        job,
+    });
 }
 
 export const getJobs = async (req, res) => {
-    const { status, page, limit } = req.query;
-    const parsedLimit = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 20;
-    const parsedPage = page ? Math.max(1, parseInt(page, 10)) : 1;
-    const linkBase = `${req.protocol}://${req.get('host')}${req.baseUrl}`;
+    const { status } = req.query;
+    const { page, limit } = parsePagination(req.query, 20);
 
-    const jobs = await fetchJobs({
+    const result = await fetchJobs({ status, page, limit });
+
+    res.status(StatusCodes.OK).json(toPaginatedBody({
+        rows: result.rows,
+        page: result.page,
+        limit: result.limit,
+        totalCount: result.total_jobs,
+        countKey: 'total_jobs',
+        linkBase: linkBaseFromReq(req),
         status,
-        page: parsedPage,
-        limit: parsedLimit,
-        linkBase,
-    });
-
-    res.status(jobs.statusCode).json(jobs.data);
+    }));
 };
 
 export const getJobById = async (req, res) => {
     const job = await fetchJobById(req.params.id);
-
-    res.status(job.statusCode).json(job.data);
+    res.status(StatusCodes.OK).json({ status: 'success', job });
 }
 
 export const getJobLogs = async (req, res) => {
-    const { event, level, page, limit } = req.query;
-    const parsedLimit = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 20;
-    const parsedPage = page ? Math.max(1, parseInt(page, 10)) : 1;
-    const linkBase = `${req.protocol}://${req.get('host')}${req.baseUrl}/${req.params.id}/logs`;
+    const { event, level } = req.query;
+    const { page, limit } = parsePagination(req.query, 20);
+    const linkBase = linkBaseFromReq(req, `/${req.params.id}/logs`);
 
-    if (req.params.id === 'all') {
-        const logs = await fetchAllJobLogs({
-            event,
-            level,
-            page: parsedPage,
-            limit: parsedLimit,
-            linkBase,
-        });
-        return res.status(logs.statusCode).json(logs.data);
-    }
+    const result = req.params.id === 'all'
+        ? await fetchAllJobLogs({ event, level, page, limit })
+        : await fetchJobLogs(req.params.id, { event, level, page, limit });
 
-    const logs = await fetchJobLogs(req.params.id, {
-        event,
-        level,
-        page: parsedPage,
-        limit: parsedLimit,
+    res.status(StatusCodes.OK).json(toPaginatedBody({
+        rows: result.rows,
+        page: result.page,
+        limit: result.limit,
+        totalCount: result.total_logs,
+        countKey: 'total_logs',
         linkBase,
-    });
-
-    res.status(logs.statusCode).json(logs.data);
+        filters: result.filters,
+    }));
 }
 
 export const cancelJob = async (req, res) => {
     const job = await cancelJobById(req.params.id);
-
-    res.status(job.statusCode).json(job.data);
+    res.status(StatusCodes.OK).json({
+        status: 'success',
+        message: 'Job cancelled successfully',
+        job,
+    });
 }
 
 export const getStats = async (req, res) => {
     const stats = await fetchStats();
-    res.status(stats.statusCode).json(stats.data);
+    res.status(StatusCodes.OK).json({ status: 'success', stats });
 }

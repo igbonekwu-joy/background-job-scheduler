@@ -1,9 +1,8 @@
 import winston from "winston";
 import pool from "../../config/database.js";
-import { StatusCodes } from "http-status-codes";
 import { publishJobEvent } from "../../utils/jobEvents.js";
 import { findDependencyCycle } from "./dependencyCycle.js";
-import { buildPageLinks } from "../../utils/pagination.js";
+import { NotFoundError, BadRequestError, UnprocessableError } from "../../utils/errors.js";
 
 export const saveJob = async (jobData) => {
     const { type, payload, priority = 2, scheduled_at, recurring_interval, max_retries = 3, dependencies = [] } = jobData;
@@ -20,7 +19,7 @@ export const saveJob = async (jobData) => {
             );
             if (rows.length !== dependencies.length) {
                 await client.query('ROLLBACK');
-                return { statusCode: StatusCodes.UNPROCESSABLE_ENTITY, data: { status: 'error', message: 'One or more dependency job IDs do not exist' } };
+                throw new UnprocessableError('One or more dependency job IDs do not exist');
             }
         }
 
@@ -37,10 +36,7 @@ export const saveJob = async (jobData) => {
             const cyclicDep = await findDependencyCycle(client, job.id, dependencies);
             if (cyclicDep) {
                 await client.query('ROLLBACK');
-                return {
-                    statusCode: StatusCodes.UNPROCESSABLE_ENTITY,
-                    data: { status: 'error', message: 'Dependency cycle detected' },
-                };
+                throw new UnprocessableError('Dependency cycle detected');
             }
         }
 
@@ -62,7 +58,7 @@ export const saveJob = async (jobData) => {
         await client.query('COMMIT');
         publishJobEvent({ status: 'pending', job_id: job.id, type: job.type }).catch(() => {});
         winston.info(`Job created: { job_id: ${job.id}, type: ${type}, priority: ${priority}, scheduled_at: ${scheduled_at} }`);
-        return { statusCode: StatusCodes.CREATED, data: { status: 'success', message: 'Job created successfully', job } };
+        return job;
     } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
         throw err;
@@ -71,7 +67,7 @@ export const saveJob = async (jobData) => {
     }
 }
 
-export const fetchJobs = async ({ status, page = 1, limit = 20, linkBase = '/api/jobs' }) => {
+export const fetchJobs = async ({ status, page = 1, limit = 20 }) => {
     const safeLimit = Math.min(100, Math.max(1, limit));
     const safePage = Math.max(1, page);
 
@@ -88,9 +84,7 @@ export const fetchJobs = async ({ status, page = 1, limit = 20, linkBase = '/api
         countParams
     );
 
-    const total = total_jobs === 0 ? 0 : Math.ceil(total_jobs / safeLimit);
     const offset = (safePage - 1) * safeLimit;
-
     const listParams = [...countParams, safeLimit, offset];
 
     const { rows } = await pool.query(
@@ -109,18 +103,7 @@ export const fetchJobs = async ({ status, page = 1, limit = 20, linkBase = '/api
         listParams
     );
 
-    return {
-        statusCode: StatusCodes.OK,
-        data: {
-            status: 'success',
-            page: safePage,
-            limit: safeLimit,
-            total,
-            total_jobs,
-            links: buildPageLinks(linkBase, { page: safePage, limit: safeLimit, status, total }),
-            data: rows,
-        },
-    };
+    return { rows, page: safePage, limit: safeLimit, total_jobs };
 }
 
 export const fetchJobById = async (id) => {
@@ -139,9 +122,9 @@ export const fetchJobById = async (id) => {
     );
 
     if (!job) {
-        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: 'Job not found' } };
+        throw new NotFoundError('Job not found');
     }
-    return { statusCode: StatusCodes.OK, data: { status: 'success', job } };
+    return job;
 }
 
 function buildLogsWhere({ job_id, event, level }) {
@@ -171,7 +154,6 @@ export const fetchAllJobLogs = async ({
     level,
     page = 1,
     limit = 20,
-    linkBase = '/api/jobs/all/logs',
 }) => {
     const safeLimit = Math.min(100, Math.max(1, limit));
     const safePage = Math.max(1, page);
@@ -182,7 +164,6 @@ export const fetchAllJobLogs = async ({
         params
     );
 
-    const total = total_logs === 0 ? 0 : Math.ceil(total_logs / safeLimit);
     const offset = (safePage - 1) * safeLimit;
     const listParams = [...params, safeLimit, offset];
 
@@ -199,30 +180,11 @@ export const fetchAllJobLogs = async ({
     if (event) filters.event = event;
     if (level) filters.level = level;
 
-    return {
-        statusCode: StatusCodes.OK,
-        data: {
-            status: 'success',
-            page: safePage,
-            limit: safeLimit,
-            total,
-            total_logs,
-            links: buildPageLinks(linkBase, {
-                page: safePage,
-                limit: safeLimit,
-                total,
-                filters,
-            }),
-            data: rows,
-        },
-    };
+    return { rows, page: safePage, limit: safeLimit, total_logs, filters };
 };
 
-export const fetchJobLogs = async (jobId, { page = 1, limit = 20, event, level, linkBase }) => {
-    const job = await fetchJobById(jobId);
-    if (job.data.status === 'error') {
-        return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: 'Job not found' } };
-    }
+export const fetchJobLogs = async (jobId, { page = 1, limit = 20, event, level } = {}) => {
+    await fetchJobById(jobId);
 
     return fetchAllJobLogs({
         job_id: jobId,
@@ -230,7 +192,6 @@ export const fetchJobLogs = async (jobId, { page = 1, limit = 20, event, level, 
         level,
         page,
         limit,
-        linkBase: linkBase ?? `/api/jobs/${jobId}/logs`,
     });
 }
 
@@ -246,12 +207,12 @@ export const cancelJobById = async (id) => {
 
         if (!job) {
             await client.query('ROLLBACK');
-            return { statusCode: StatusCodes.NOT_FOUND, data: { status: 'error', message: `Job ${id} not found` } };
+            throw new NotFoundError(`Job ${id} not found`);
         }
 
         if (['completed', 'failed', 'cancelled'].includes(job.status)) {
             await client.query('ROLLBACK');
-            return { statusCode: StatusCodes.BAD_REQUEST, data: { status: 'error', message: `Cannot cancel a job with status of '${job.status}'` } };
+            throw new BadRequestError(`Cannot cancel a job with status of '${job.status}'`);
         }
 
         const { rows: [updated] } = await client.query(
@@ -270,7 +231,7 @@ export const cancelJobById = async (id) => {
         await client.query('COMMIT');
         publishJobEvent({ status: 'cancelled', job_id: updated.id, type: updated.type }).catch(() => {});
         winston.info(`Job cancelled: { job_id: ${id}, previous_status: ${job.status} }`);
-        return { statusCode: StatusCodes.OK, data: { status: 'success', message: 'Job cancelled successfully', job: updated } };
+        return updated;
     } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
         throw err;
@@ -292,7 +253,7 @@ export const fetchStats = async () => {
     for (const row of statusRows) stats[row.status] = row.count;
     stats.dlq_unresolved = dlqRow.count;
 
-    return { statusCode: StatusCodes.OK, data: { status: 'success', stats } };
+    return stats;
 }
 
 export const logEvent = async (client, { jobId, event, level = 'info', message, metadata = {} }) => {
