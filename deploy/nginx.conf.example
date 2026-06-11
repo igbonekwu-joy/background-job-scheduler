@@ -3,49 +3,24 @@
 
 server {
     listen 80;
-    server_name bg-job-scheduler.duckdns.org;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name bg-job-scheduler.duckdns.org;
-
-    ssl_certificate /etc/letsencrypt/live/bg-job-scheduler.duckdns.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/bg-job-scheduler.duckdns.org/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-
-    large_client_header_buffers 4 16k;
+    server_name 51.21.200.61;
 
     root /var/www/queuectl/client/dist;
     index index.html;
 
-    # SSE — dedicated block; must not buffer or disable chunked encoding
-    location = /api/events {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Connection '';
-
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 86400s;
-        gzip off;
-    }
-
     location /api/ {
         proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
-
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 86400s;
+        chunked_transfer_encoding off;
     }
 
     location / {
