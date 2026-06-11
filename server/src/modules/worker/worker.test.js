@@ -256,12 +256,13 @@ describe('recordFailure', () => {
     assert.equal(findQuery(client, /^COMMIT$/).sql, 'COMMIT');
   });
 
-  it('sends job to DLQ when failure count reaches max_retries', async () => {
+  it('sends job to DLQ when failure count exceeds max_retries', async () => {
     const client = createMockClient([{}, { rows: [{ status: 'processing' }] }, {}, {}, {}, {}]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
     const checkDlqThreshold = mock.fn(async () => {});
-    const job = { ...baseJob, max_retries: 3, retry_count: 2 };
+    // max_retries=3 allows 3 retries; DLQ on the 4th failure (retry_count 3 → newCount 4)
+    const job = { ...baseJob, max_retries: 3, retry_count: 3 };
     const err = new Error('still failing');
 
     const { recordFailure } = createWorker({
