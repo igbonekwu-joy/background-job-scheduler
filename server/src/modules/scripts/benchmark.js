@@ -1,22 +1,10 @@
-/**
- * BENCHMARK — Heap vs Timing Wheel
- *
- * Measures insert and retrieval performance for both algorithms
- * across three dataset sizes: 1 000 / 10 000 / 100 000 jobs.
- *
- *
- * Output:
- *   - Table printed to stdout
- *   - Results saved to logs/benchmark.json
- */
-
 import { writeFileSync, mkdirSync } from 'fs';
 import { MinHeap }     from '../scheduler/heap.js';
 import { TimingWheel } from '../scheduler/timingWheel.js';
 
 const SIZES = [1_000, 10_000, 100_000];
 
-// ─── JOB FACTORY ─────────────────────────────────────────────────────────────
+// JOB FACTORY
 // Generates a realistic job object matching the exact shape the scheduler uses.
 // Priorities and run_at values are randomised so neither algorithm gets
 // an artificially easy input.
@@ -38,7 +26,7 @@ function makeJob(i) {
   };
 }
 
-// ─── TIMER ───────────────────────────────────────────────────────────────────
+// TIMER 
 
 function measure(fn) {
   const start = performance.now();
@@ -46,7 +34,7 @@ function measure(fn) {
   return performance.now() - start;
 }
 
-// ─── HEAP BENCHMARK ──────────────────────────────────────────────────────────
+// HEAP BENCHMARK
 
 function benchmarkHeap(jobs) {
   const heap = new MinHeap();
@@ -62,7 +50,7 @@ function benchmarkHeap(jobs) {
   return { insertMs, popMs };
 }
 
-// ─── TIMING WHEEL BENCHMARK ──────────────────────────────────────────────────
+// TIMING WHEEL BENCHMARK
 
 function benchmarkWheel(jobs) {
   const wheel = new TimingWheel(1000, 3600);
@@ -79,12 +67,12 @@ function benchmarkWheel(jobs) {
   return { insertMs, tickMs };
 }
 
-// ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
+// FORMAT HELPERS 
 
 const fmt   = (ms)  => ms.toFixed(3).padStart(10);
 const fmtOp = (ms, n) => (ms / n * 1000).toFixed(3).padStart(12); // µs per op
 
-// ─── RUN ─────────────────────────────────────────────────────────────────────
+// RUN
 
 const results = [];
 
@@ -138,11 +126,10 @@ for (const r of results) {
   console.log(`  ${String(r.n.toLocaleString()).padEnd(13)}${heapStr}${wheelStr}${winner}`);
 }
 
-// ─── TRADEOFFS ───────────────────────────────────────────────────────────────
+// TRADEOFFS 
 
 console.log(`
   TRADEOFFS
-  ─────────────────────────────────────────────────────────────────────
   Heap
     + Strict priority ordering — high-priority jobs always run first
     + Works naturally for any time range, no pre-allocated memory
@@ -159,10 +146,9 @@ console.log(`
   This project uses BOTH:
     The heap drives actual job dispatch (priority matters).
     The timing wheel tracks scheduled_at for time-based firing.
-  ─────────────────────────────────────────────────────────────────────
 `);
 
-// ─── SAVE JSON ───────────────────────────────────────────────────────────────
+// SAVE JSON 
 
 mkdirSync('logs', { recursive: true });
 const outPath = 'logs/benchmark.json';
