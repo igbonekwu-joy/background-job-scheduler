@@ -1,6 +1,6 @@
 # Background Job Scheduler
 
-A background job scheduler built at Dilamme. Jobs are created via a REST API, queued in a heap-based priority queue, processed by an independent worker process, and tracked through a React dashboard with live updates.
+A background job scheduler. Jobs are created via a REST API, queued in a heap-based priority queue, processed by an independent worker process, and tracked through a React dashboard with live updates.
 
 ---
 
@@ -8,27 +8,45 @@ A background job scheduler built at Dilamme. Jobs are created via a REST API, qu
 
 ```
 /
-├── client/               React frontend (Vite)
-├── server/               Node.js API + worker
-│   ├── docs/             Swagger docs
-│   └── src/
-│       ├── config/       Database pool, Winston logger
-│       ├── middleware/   Async handler, and error handler
-│       ├── migrations/   Migrations file for the database
-│       ├── modules/      All module folders
-|       |   ├── dlq/      Dead-Letter Queue resource
-│       |   ├── handlers/ Job type implementations (email simulation)
-|       |   ├── jobs/     Jobs resource
-|       |   ├── scheduler/ Min-heap, timing wheel, scheduler loop
-|       |   ├── scripts/   Time Wheel Benchmark
-|       |   ├── sse/      Server Side Events resource
-|       |   └── worker/   Background Worker process
-|       |
-│       ├── utils/        Shared event emitter
-│       ├── app.js    
-│       ├── routes.js     All route entry point
-|       ├── package.json       
-|       └── server.js
+├── client/                         React dashboard (Vite)
+│   ├── public/
+│   ├── src/
+│   │   ├── api/                    REST clients (jobs, dlq, logs)
+│   │   ├── components/             CreateJobModal, Sidebar, StatusPill
+│   │   ├── hooks/                  useJobEvents (SSE)
+│   │   ├── pages/                  Dashboard, Jobs, DLQ, Logs
+│   │   └── data/                   seed.js (offline demo data)
+│   ├── index.html
+│   └── vite.config.js
+│
+├── server/                         Node.js API + worker
+│   ├── docs/                       Swagger / OpenAPI
+│   ├── logs/                       benchmark.json
+│   ├── src/
+│   │   ├── config/                 database, env, logger, pgDirect
+│   │   ├── middleware/             asyncHandler, errorHandler
+│   │   ├── migrations/             PostgreSQL schema migrations
+│   │   ├── modules/
+│   │   │   ├── dlq/                Dead-letter queue
+│   │   │   ├── handlers/           Job handlers (send_email)
+│   │   │   ├── jobs/               CRUD, logs, stats, dependency cycles
+│   │   │   ├── scheduler/          MinHeap, TimingWheel, scheduler loop
+│   │   │   ├── scripts/            benchmark.js
+│   │   │   ├── sse/                SSE stream for live UI
+│   │   │   └── worker/             Claim, retry, DLQ, processJob
+│   │   ├── utils/                  jobEvents, apiResponse, pagination, errors
+│   │   ├── app.js
+│   │   └── routes.js
+│   ├── server.js                   API entry point
+│   └── .env.example
+│
+├── deploy/                         VPS deployment
+│   ├── README.md
+│   ├── nginx.conf.example
+│   ├── ecosystem.config.cjs        PM2 (api + worker)
+│   └── deploy.sh
+│
+├── .github/workflows/              CI and deploy
 ├── .gitignore
 └── README.md
 ```
