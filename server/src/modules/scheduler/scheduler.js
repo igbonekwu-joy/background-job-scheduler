@@ -3,6 +3,7 @@ import { MinHeap }     from './heap.js';
 import { TimingWheel } from './timingWheel.js';
 import pool from '../../config/database.js';
 import env from '../../config/env.js';
+import { logEvent } from '../jobs/jobs.service.js';
 
 const POLL_MS       = parseInt(env.WORKER_POLL_INTERVAL_MS      || '2000');
 const STARVATION_MS = parseInt(env.STARVATION_THRESHOLD_MINUTES || '5') * 60_000;
@@ -63,23 +64,51 @@ class Scheduler {
   }
 
   async #boostStarved() {
+    const client = await pool.connect();
+    const thresholdMin = STARVATION_MS / 60_000;
+
     try {
-      // Update Postgres — source of truth
-      const { rowCount } = await pool.query(`
+      await client.query('BEGIN');
+
+      const { rows } = await client.query(`
         UPDATE jobs
         SET    effective_priority = GREATEST(1, effective_priority - 1)
         WHERE  status             = 'pending'
           AND  effective_priority > 1
           AND  created_at        <= NOW() - ($1 || ' milliseconds')::INTERVAL
+        RETURNING id, effective_priority, priority
       `, [STARVATION_MS]);
 
-      // Mirror the boost in the in-memory heap immediately
+      for (const row of rows) {
+        const newPriority = Number(row.effective_priority);
+        const previousPriority = newPriority + 1;
+
+        await logEvent(client, {
+          jobId:   row.id,
+          event:   'job.priority_boosted',
+          level:   'info',
+          message: `Starvation boost: effective_priority ${previousPriority} → ${newPriority} (waited ≥ ${thresholdMin} min)`,
+          metadata: {
+            previous_effective_priority: previousPriority,
+            effective_priority: newPriority,
+            base_priority: row.priority,
+            threshold_minutes: thresholdMin,
+          },
+        });
+      }
+
+      await client.query('COMMIT');
+
+      // Mirror the boost in memory immediately
       const changed = this.#heap.boostStarved(STARVATION_MS);
 
-      if (rowCount > 0 || changed)
-        winston.info('Starvation boost', { db_rows: rowCount, in_heap: changed });
+      if (rows.length > 0 || changed)
+        winston.info('Starvation boost', { db_rows: rows.length, in_heap: changed });
     } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
       winston.error('Starvation boost error', { error: err.message });
+    } finally {
+      client.release();
     }
   }
 }

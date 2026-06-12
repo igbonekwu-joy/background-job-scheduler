@@ -4,9 +4,9 @@ import { seedLogs, fmtTime } from '../data/seed';
 
 const EVENTS = [
   'job.created',
-  'job.held',
   'job.started',
   'job.retry',
+  'job.priority_boosted',
   'job.failed',
   'job.cancelled',
   'job.completed',
