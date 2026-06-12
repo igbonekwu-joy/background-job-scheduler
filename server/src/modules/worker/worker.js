@@ -78,6 +78,12 @@ export function createWorker(deps = {}) {
         const blocked = unmet.filter(d => d.status === 'failed' || d.status === 'cancelled');
         if (blocked.length) {
           const reason = `Blocked by ${blocked.length === 1 ? 'dependency' : 'dependencies'}: ${blocked.map(depLabel).join(', ')}`;
+          const { inserted } = await upsertDlqEntry(client, {
+            jobId:         locked.id,
+            jobSnapshot:   locked,
+            failureReason: reason,
+          });
+
           await client.query(
             `UPDATE jobs SET status = 'failed', error_message = $1 WHERE id = $2`,
             [reason, locked.id]
@@ -86,11 +92,29 @@ export function createWorker(deps = {}) {
             jobId:    locked.id,
             event:    'job.failed',
             level:    'error',
-            message:  reason,
-            metadata: { blocked_by: blocked.map(d => d.id) },
+            message:  inserted
+              ? `${reason}. Sent to DLQ.`
+              : `${reason}. Updated existing DLQ entry.`,
+            metadata: {
+              blocked_by: blocked.map(d => d.id),
+              dlq_updated: !inserted,
+            },
           });
           await client.query('COMMIT');
+
           publish({ status: 'failed', job_id: locked.id, type: locked.type }).catch(() => {});
+
+          if (inserted) {
+            winston.warn('Job sent to DLQ', {
+              job_id: locked.id,
+              type:   locked.type,
+              reason: 'dependency_blocked',
+            });
+            await checkThreshold();
+          } else {
+            winston.info('DLQ entry updated', { job_id: locked.id, type: locked.type });
+          }
+
           winston.warn('Job failed: dependency not satisfiable', {
             job_id: locked.id,
             blocked_by: blocked.map(d => d.id),

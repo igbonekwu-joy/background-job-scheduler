@@ -103,29 +103,36 @@ describe('claimJob', () => {
       {},
       { rows: [{ ...baseJob, id: 'job-1', type: 'send_email' }] },
       { rows: [{ id: 'dep-1', name: 'Upstream job', status: 'failed' }] },
+      { rowCount: 0 },
+      {},
       {},
       {},
     ]);
     const logEvent = mock.fn(async () => {});
     const publishJobEvent = mock.fn(async () => {});
+    const checkDlqThreshold = mock.fn(async () => {});
     const { claimJob } = createWorker({
       pool: createMockPool(claimClient),
       logEvent,
       publishJobEvent,
+      checkDlqThreshold,
     });
 
     const result = await claimJob('job-1');
 
     assert.equal(result, null);
     assert.match(findQuery(claimClient, /status = 'failed'/).sql, /failed/);
+    assert.match(findQuery(claimClient, /INSERT INTO dead_letter_queue/).sql, /dead_letter_queue/);
     assert.equal(logEvent.mock.calls[0].arguments[1].event, 'job.failed');
     assert.match(logEvent.mock.calls[0].arguments[1].message, /Upstream job/);
+    assert.match(logEvent.mock.calls[0].arguments[1].message, /Sent to DLQ/);
     assert.deepEqual(logEvent.mock.calls[0].arguments[1].metadata.blocked_by, ['dep-1']);
     assert.deepEqual(publishJobEvent.mock.calls[0].arguments[0], {
       status: 'failed',
       job_id: 'job-1',
       type: 'send_email',
     });
+    assert.equal(checkDlqThreshold.mock.calls.length, 1);
     assert.equal(findQuery(claimClient, /^COMMIT$/).sql, 'COMMIT');
   });
 
