@@ -1,11 +1,3 @@
-/**
- * MIN-HEAP PRIORITY QUEUE
- * Ordering
- *   1. effective_priority ASC  => 1=high beats 2=medium beats 3=low
- *   2. run_at ASC              => earlier scheduled time goes first
- *   3. created_at ASC          => older job wins the tie
- 
- */
 export class MinHeap {
   #heap = [];
 
