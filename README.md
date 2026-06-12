@@ -468,5 +468,5 @@ Logged events: `job.created`, `job.held`, `job.started`, `job.retry`, `job.faile
 | `npm run migrate` | Run all pending migrations |
 | `npm run migrate:down` | Roll back all migrations |
 | `npm run benchmark` | Run heap vs timing wheel benchmark |
-| `npm run dev:api` | Start API server with nodemon |
+| `npm run dev` | Start API server with nodemon |
 | `npm run dev:worker` | Start worker with nodemon |
