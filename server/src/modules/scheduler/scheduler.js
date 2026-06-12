@@ -2,9 +2,10 @@ import winston  from 'winston';
 import { MinHeap }     from './heap.js';
 import { TimingWheel } from './timingWheel.js';
 import pool from '../../config/database.js';
+import env from '../../config/env.js';
 
-const POLL_MS       = parseInt(process.env.WORKER_POLL_INTERVAL_MS      || '2000');
-const STARVATION_MS = parseInt(process.env.STARVATION_THRESHOLD_MINUTES || '5') * 60_000;
+const POLL_MS       = parseInt(env.WORKER_POLL_INTERVAL_MS      || '2000');
+const STARVATION_MS = parseInt(env.STARVATION_THRESHOLD_MINUTES || '5') * 60_000;
 
 class Scheduler {
   #heap    = new MinHeap();
