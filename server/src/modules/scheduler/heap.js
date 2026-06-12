@@ -55,10 +55,10 @@ export class MinHeap {
 
   #up(i) {
     while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (!this.#before(this.#heap[i], this.#heap[p])) break;
-      [this.#heap[i], this.#heap[p]] = [this.#heap[p], this.#heap[i]];
-      i = p;
+      const parent = (i - 1) >> 1;
+      if (!this.#before(this.#heap[i], this.#heap[parent])) break;
+      [this.#heap[i], this.#heap[parent]] = [this.#heap[parent], this.#heap[i]];
+      i = parent;
     }
   }
 
